@@ -26,7 +26,7 @@ class MyApp extends StatelessWidget {
       designSize: const Size(1512, 982),
 
       child: MaterialApp(
-        title: 'Admin Dashboard',
+        title: '배달 담당자 인터페이스',
         theme: ThemeData(
           primarySwatch: Colors.blue,
           scaffoldBackgroundColor: Colors.white,
@@ -55,7 +55,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '${FirebaseAuth.instance.currentUser?.displayName} Delivery Info Entry',
+              '${FirebaseAuth.instance.currentUser?.displayName} 님 환영합니다',
               style: TextStyle(
                 fontSize: 40.sp,
                 fontWeight: FontWeight.bold,
@@ -69,15 +69,15 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
               ),
               child: Row(
                 children: [
-                  _buildTableHeader('Product', 2),
-                  _buildTableHeader('Quantity', 1),
-                  _buildTableHeader('Order ID', 1),
-                  _buildTableHeader('Recipient', 1),
-                  _buildTableHeader('Address', 3),
-                  _buildTableHeader('Delivery Instructions', 1),
-                  _buildTableHeader('Courier', 1),
-                  _buildTableHeader('Tracking No.', 1),
-                  _buildTableHeader('Action', 1),
+                  _buildTableHeader('제품', 2),
+                  _buildTableHeader('수량', 1),
+                  _buildTableHeader('주문 ID', 1),
+                  _buildTableHeader('수취인', 1),
+                  _buildTableHeader('주소', 3),
+                  _buildTableHeader('배송 요청사항', 1),
+                  _buildTableHeader('택배사', 1),
+                  _buildTableHeader('운송장 번호', 1),
+                  _buildTableHeader('', 1),
                 ],
               ),
             ),
@@ -98,12 +98,12 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                   }
                   // 3. Check for null data
                   if (!snapshot.hasData || snapshot.data == null) {
-                    return Center(child: Text('No orders available'));
+                    return Center(child: Text('주문이 없습니다'));
                   }
                   final orders = snapshot.data!.docs;
 
                   if (orders.isEmpty) {
-                    return Center(child: Text('No orders found'));
+                    return Center(child: Text('주문이 없습니다'));
                   }
                   return ListView.builder(
                     itemCount: orders.length,
@@ -197,7 +197,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
 
       builder: (context, snapshot) {
         if (!snapshot.hasData || snapshot.data == null) {
-          return Center(child: Text('No user found'));
+          return Center(child: Text('사용자가 없습니다'));
         }
         final userSnapshot = snapshot.data![0] as DocumentSnapshot;
         final user = MyUser.fromDocument(
@@ -336,7 +336,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                     controller: deliveryAddressController,
 
                     decoration: InputDecoration(
-                      labelText: 'Courier Id',
+                      labelText: '택배사',
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -352,7 +352,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                   child: TextField(
                     controller: trackingNumberController,
                     decoration: InputDecoration(
-                      labelText: 'Tracking Number',
+                      labelText: '운송장 번호',
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -380,7 +380,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                       ),
                       fixedSize: Size.fromWidth(110.w),
                     ),
-                    child: Text('Submit'),
+                    child: Text('제출'),
                   ),
                 ),
               ),

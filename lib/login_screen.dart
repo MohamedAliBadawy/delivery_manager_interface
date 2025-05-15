@@ -37,9 +37,9 @@ class _LoginScreenState extends State<LoginScreen> {
           MaterialPageRoute(builder: (context) => DeliveryManagerInterface()),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No account found with this phone number')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('사용자를 찾을수 없습니다')));
       }
     } catch (e) {
       ScaffoldMessenger.of(
@@ -60,14 +60,14 @@ class _LoginScreenState extends State<LoginScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                'Login',
+                '로그인',
                 style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
               ),
               SizedBox(height: 32),
               TextField(
                 controller: _phoneController,
                 decoration: InputDecoration(
-                  labelText: 'Phone Number',
+                  labelText: '전화번호',
                   border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.phone,
@@ -94,10 +94,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               color: Colors.white,
                             ),
                           )
-                          : Text(
-                            'Login',
-                            style: TextStyle(color: Colors.white),
-                          ),
+                          : Text('로그인', style: TextStyle(color: Colors.white)),
                 ),
               ),
             ],
