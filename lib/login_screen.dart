@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delivery_manager_interface/main.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -9,34 +11,42 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  final TextEditingController _phoneController = TextEditingController();
   bool _isLoading = false;
   String? _errorMessage;
 
   Future<void> _login() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    setState(() => _isLoading = true);
+
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
-      // On success, you can navigate or do something else.
-    } on FirebaseAuthException catch (e) {
-      setState(() {
-        _errorMessage = e.message;
-      });
+      final phoneNumber = _phoneController.text.trim();
+
+      // Check if phone exists in delivery managers collection
+      final doc =
+          await _firestore
+              .collection('deliveryManagers')
+              .where('phone', isEqualTo: phoneNumber)
+              .get();
+
+      if (doc.docs.isNotEmpty) {
+        // Successful login - navigate to home screen
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => DeliveryManagerInterface()),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No account found with this phone number')),
+        );
+      }
     } catch (e) {
-      setState(() {
-        _errorMessage = 'An error occurred. Please try again.';
-      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Login failed: $e')));
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
     }
   }
 
@@ -55,22 +65,14 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               SizedBox(height: 32),
               TextField(
-                controller: _emailController,
+                controller: _phoneController,
                 decoration: InputDecoration(
-                  labelText: 'Email',
+                  labelText: 'Phone Number',
                   border: OutlineInputBorder(),
                 ),
-                keyboardType: TextInputType.emailAddress,
+                keyboardType: TextInputType.phone,
               ),
-              SizedBox(height: 16),
-              TextField(
-                controller: _passwordController,
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  border: OutlineInputBorder(),
-                ),
-                obscureText: true,
-              ),
+
               SizedBox(height: 24),
               if (_errorMessage != null)
                 Text(_errorMessage!, style: TextStyle(color: Colors.red)),

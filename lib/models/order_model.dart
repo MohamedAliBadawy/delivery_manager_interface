@@ -12,7 +12,7 @@ class MyOrder {
   int quantity;
   double totalPrice;
   String orderDate;
-  List<dynamic> trackingEvents;
+  Map<String, dynamic> trackingEvents;
   String trackingNumber;
   String userId;
   String deliveryManagerId;
@@ -59,22 +59,22 @@ class MyOrder {
 
   static MyOrder fromDocument(Map<String, dynamic> doc) {
     return MyOrder(
-      orderId: doc['orderId'],
-      userId: doc['userId'],
-      cashReceipt: doc['cashReceipt'],
-      courier: doc['courier'],
-      deliveryAddress: doc['deliveryAddress'],
-      deliveryInstructions: doc['deliveryInstructions'],
-      orderStatus: doc['orderStatus'],
-      paymentMethod: doc['paymentMethod'],
-      productId: doc['productId'],
-      quantity: doc['quantity'],
-      totalPrice: doc['totalPrice'],
-      orderDate: doc['orderDate'],
-      trackingEvents: doc['trackingEvents'],
-      trackingNumber: doc['trackingNumber'],
-      deliveryManagerId: doc['deliveryManagerId'],
-      deliveryManager: doc['deliveryManager'],
+      orderId: doc['orderId'] ?? '',
+      userId: doc['userId'] ?? '',
+      cashReceipt: doc['cashReceipt'] ?? '',
+      courier: doc['courier'] ?? '',
+      deliveryAddress: doc['deliveryAddress'] ?? '',
+      deliveryInstructions: doc['deliveryInstructions'] ?? '',
+      orderStatus: doc['orderStatus'] ?? '',
+      paymentMethod: doc['paymentMethod'] ?? '',
+      productId: doc['productId'] ?? '',
+      quantity: doc['quantity'] ?? 0,
+      totalPrice: doc['totalPrice'] ?? 0.0,
+      orderDate: doc['orderDate'] ?? '',
+      trackingEvents: doc['trackingEvents'] ?? {},
+      trackingNumber: doc['trackingNumber'] ?? '',
+      deliveryManagerId: doc['deliveryManagerId'] ?? '',
+      deliveryManager: doc['deliveryManager'] ?? '',
     );
   }
 

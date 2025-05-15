@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delivery_manager_interface/models/order_model.dart';
+import 'package:delivery_manager_interface/models/product_model.dart';
 import 'package:delivery_manager_interface/models/user_model.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -30,19 +31,7 @@ class MyApp extends StatelessWidget {
           primarySwatch: Colors.blue,
           scaffoldBackgroundColor: Colors.white,
         ),
-        home: StreamBuilder<User?>(
-          stream: FirebaseAuth.instance.authStateChanges(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasData) {
-              return DeliveryManagerInterface();
-            } else {
-              return LoginScreen();
-            }
-          },
-        ),
+        home: LoginScreen(),
       ),
     );
   }
@@ -80,9 +69,12 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
               ),
               child: Row(
                 children: [
+                  _buildTableHeader('Product', 2),
+                  _buildTableHeader('Quantity', 1),
                   _buildTableHeader('Order ID', 1),
                   _buildTableHeader('Recipient', 1),
                   _buildTableHeader('Address', 3),
+                  _buildTableHeader('Delivery Instructions', 1),
                   _buildTableHeader('Courier', 1),
                   _buildTableHeader('Tracking No.', 1),
                   _buildTableHeader('Action', 1),
@@ -147,8 +139,11 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
       String trackingNumber,
     ) async {
       try {
-        final callbackUrl = 'https://trackwaybill-nlc5xkd7oa-uc.a.run.app/';
-
+        await FirebaseFirestore.instance
+            .collection('orders')
+            .doc(order.orderId)
+            .update({'trackingNumber': trackingNumber, 'carrierId': carrierId});
+        final callbackUrl = 'https://trackingwebhook-nlc5xkd7oa-uc.a.run.app/';
         final expirationTime =
             DateTime.now().add(Duration(hours: 48)).toUtc().toIso8601String();
 
@@ -164,7 +159,6 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                 "mutation RegisterTrackWebhook(\$input: RegisterTrackWebhookInput!) { registerTrackWebhook(input: \$input) }",
             "variables": {
               "input": {
-                "orderId": order.orderId,
                 "carrierId": carrierId,
                 "trackingNumber": trackingNumber,
                 "callbackUrl": callbackUrl,
@@ -193,18 +187,26 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
     }
 
     return FutureBuilder(
-      future:
-          FirebaseFirestore.instance
-              .collection('users')
-              .doc(order.userId)
-              .get(),
+      future: Future.wait([
+        FirebaseFirestore.instance.collection('users').doc(order.userId).get(),
+        FirebaseFirestore.instance
+            .collection('products')
+            .doc(order.productId)
+            .get(),
+      ]),
+
       builder: (context, snapshot) {
         if (!snapshot.hasData || snapshot.data == null) {
           return Center(child: Text('No user found'));
         }
-        final userSnapshot = snapshot.data! as DocumentSnapshot;
+        final userSnapshot = snapshot.data![0] as DocumentSnapshot;
         final user = MyUser.fromDocument(
           userSnapshot.data() as Map<String, dynamic>,
+        );
+
+        final productSnapshot = snapshot.data![1] as DocumentSnapshot;
+        final product = Product.fromMap(
+          productSnapshot.data() as Map<String, dynamic>,
         );
 
         final trackingNumberController = TextEditingController();
@@ -217,6 +219,47 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
           ),
           child: Row(
             children: [
+              Expanded(
+                flex: 2,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Row(
+                    children: [
+                      product.imgUrl != null
+                          ? Image.network(
+                            product.imgUrl!,
+                            width: 50,
+                            height: 50,
+                            fit: BoxFit.cover,
+                          )
+                          : Container(
+                            width: 50,
+                            height: 50,
+                            color: Colors.grey.shade300,
+                          ),
+                      SizedBox(width: 16),
+                      Flexible(child: Text(product.productName)),
+                    ],
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 1,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8.0,
+                    vertical: 8,
+                  ),
+                  child: Text(
+                    order.quantity.toString(),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16.sp,
+                    ),
+                  ),
+                ),
+              ),
+
               Expanded(
                 flex: 1,
                 child: Padding(
@@ -259,6 +302,22 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                   ),
                   child: Text(
                     order.deliveryAddress,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16.sp,
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 1,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8.0,
+                    vertical: 8,
+                  ),
+                  child: Text(
+                    order.deliveryInstructions,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16.sp,
