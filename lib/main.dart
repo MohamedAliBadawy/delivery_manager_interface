@@ -5,6 +5,7 @@ import 'package:delivery_manager_interface/models/user_model.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'firebase_options.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'login_screen.dart';
@@ -38,7 +39,9 @@ class MyApp extends StatelessWidget {
 }
 
 class DeliveryManagerInterface extends StatefulWidget {
-  const DeliveryManagerInterface({super.key});
+  const DeliveryManagerInterface({super.key, required this.phoneNumber});
+
+  final String phoneNumber;
 
   @override
   State<DeliveryManagerInterface> createState() =>
@@ -46,6 +49,31 @@ class DeliveryManagerInterface extends StatefulWidget {
 }
 
 class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
+  final ItemScrollController itemScrollController = ItemScrollController();
+  final ItemPositionsListener itemPositionsListener =
+      ItemPositionsListener.create();
+
+  final ValueNotifier<int> _currentIndexNotifier = ValueNotifier<int>(0);
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Update the notifier value when positions change
+    itemPositionsListener.itemPositions.addListener(() {
+      final positions = itemPositionsListener.itemPositions.value;
+      if (positions.isNotEmpty) {
+        _currentIndexNotifier.value = positions.first.index;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _currentIndexNotifier.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -54,12 +82,450 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '${FirebaseAuth.instance.currentUser?.displayName} 님 환영합니다',
-              style: TextStyle(
-                fontSize: 40.sp,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
+            IntrinsicHeight(
+              child: Row(
+                children: [
+                  Flexible(
+                    flex: 1,
+                    child: FutureBuilder(
+                      future:
+                          FirebaseFirestore.instance
+                              .collection('deliveryManagers')
+                              .where('phone', isEqualTo: widget.phoneNumber)
+                              .get(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+
+                        if (snapshot.hasError ||
+                            !snapshot.hasData ||
+                            snapshot.data!.docs.isEmpty) {
+                          return Padding(
+                            padding: EdgeInsets.all(16.0),
+                            child: Text('Manager information not found'),
+                          );
+                        }
+
+                        final manager = snapshot.data!.docs.first.data();
+                        return Column(
+                          children: [
+                            Text(
+                              'Manage Information',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Table(
+                                defaultVerticalAlignment:
+                                    TableCellVerticalAlignment.middle,
+
+                                border: TableBorder.all(
+                                  width: 2.0,
+                                  color: Colors.black,
+                                ),
+                                children: [
+                                  TableRow(
+                                    children: [
+                                      Center(child: Text('Name')),
+                                      Center(
+                                        child: Text(manager['name'] ?? 'N/A'),
+                                      ),
+                                    ],
+                                  ),
+                                  TableRow(
+                                    children: [
+                                      Center(child: Text('Phone number')),
+                                      Center(
+                                        child: Text(manager['phone'] ?? 'N/A'),
+                                      ),
+                                    ],
+                                  ),
+                                  TableRow(
+                                    children: [
+                                      Center(child: Text('Email')),
+                                      Center(
+                                        child: Text(manager['email'] ?? 'N/A'),
+                                      ),
+                                    ],
+                                  ),
+                                  TableRow(
+                                    children: [
+                                      Center(
+                                        child: Text('Banking information'),
+                                      ),
+                                      Center(
+                                        child: Text(
+                                          manager['bankInfo'] ?? 'N/A',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                  Flexible(
+                    flex: 3,
+                    child: StreamBuilder(
+                      stream:
+                          FirebaseFirestore.instance
+                              .collection('products')
+                              .where(
+                                'deliveryManagerId',
+                                isEqualTo: widget.phoneNumber,
+                              )
+                              .snapshots(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+
+                        if (snapshot.hasError ||
+                            !snapshot.hasData ||
+                            snapshot.data!.docs.isEmpty) {
+                          return Padding(
+                            padding: EdgeInsets.all(16.0),
+                            child: Text('No products found'),
+                          );
+                        }
+
+                        final products = snapshot.data!.docs;
+                        return SizedBox(
+                          height: 300, // Adjust based on your needs
+                          child: Stack(
+                            children: [
+                              ScrollablePositionedList.builder(
+                                itemScrollController: itemScrollController,
+                                itemPositionsListener: itemPositionsListener,
+                                scrollDirection: Axis.horizontal,
+                                itemCount: products.length,
+                                itemBuilder: (context, index) {
+                                  final product = products[index];
+                                  return Row(
+                                    children: [
+                                      Container(
+                                        width:
+                                            300, // Fixed width for each product card
+                                        margin: const EdgeInsets.only(
+                                          right: 16,
+                                        ),
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(16.0),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.center,
+                                            children: [
+                                              const Text(
+                                                'Contract Information',
+                                                style: TextStyle(
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 16),
+                                              Table(
+                                                border: TableBorder.all(
+                                                  width: 2,
+                                                  color: Colors.black,
+                                                ),
+                                                children: [
+                                                  TableRow(
+                                                    children: [
+                                                      const Center(
+                                                        child: Text(
+                                                          'Product Name',
+                                                        ),
+                                                      ),
+                                                      Center(
+                                                        child: Text(
+                                                          product['productName'] ??
+                                                              'N/A',
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  TableRow(
+                                                    children: [
+                                                      const Center(
+                                                        child: Text(
+                                                          'Supply price',
+                                                        ),
+                                                      ),
+                                                      Center(
+                                                        child: Text(
+                                                          '₩${product['price']?.toString() ?? 'N/A'}',
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  TableRow(
+                                                    children: [
+                                                      const Center(
+                                                        child: Text(
+                                                          'Delivery price',
+                                                        ),
+                                                      ),
+                                                      Center(
+                                                        child: Text(
+                                                          '₩ ${product['deliveryPrice']?.toString() ?? 'N/A'}',
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  TableRow(
+                                                    children: [
+                                                      const Center(
+                                                        child: Text(
+                                                          'Additional shipping fee for remote',
+                                                        ),
+                                                      ),
+                                                      Center(
+                                                        child: Text(
+                                                          '₩ ${product['shippingFee']?.toString() ?? 'N/A'}',
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      Container(
+                                        width:
+                                            300, // Fixed width for each product card
+                                        margin: const EdgeInsets.only(
+                                          right: 16,
+                                        ),
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(16.0),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.center,
+                                            children: [
+                                              const Text(
+                                                'Order cut-off time/ Stock Management',
+                                                style: TextStyle(
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              Table(
+                                                border: TableBorder.all(
+                                                  width: 2,
+                                                  color: Colors.black,
+                                                ),
+                                                children: [
+                                                  TableRow(
+                                                    children: [
+                                                      const Center(
+                                                        child: Text(
+                                                          'Order cut-off time',
+                                                        ),
+                                                      ),
+                                                      Center(
+                                                        child: Text(
+                                                          '${product['baselineTime']?.toString() ?? 'N/A'} ${product['meridiem'] ?? 'N/A'}',
+                                                        ),
+                                                      ),
+                                                      Center(
+                                                        child: ElevatedButton(
+                                                          onPressed: () {
+                                                            _editCutoffTime(
+                                                              product.data(),
+                                                            );
+                                                          },
+
+                                                          style: ElevatedButton.styleFrom(
+                                                            backgroundColor:
+                                                                Colors.black,
+                                                            foregroundColor:
+                                                                Colors.white,
+                                                            shape: RoundedRectangleBorder(
+                                                              borderRadius:
+                                                                  BorderRadius.circular(
+                                                                    0,
+                                                                  ),
+                                                            ),
+                                                            fixedSize:
+                                                                Size.fromWidth(
+                                                                  110.w,
+                                                                ),
+                                                          ),
+                                                          child: Text(
+                                                            '변경',
+                                                            style: TextStyle(
+                                                              color:
+                                                                  Colors.white,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  TableRow(
+                                                    children: [
+                                                      const Center(
+                                                        child: Text(
+                                                          'Current stock',
+                                                        ),
+                                                      ),
+                                                      Center(
+                                                        child: Text(
+                                                          product['stock']
+                                                                  ?.toString() ??
+                                                              'N/A',
+                                                        ),
+                                                      ),
+                                                      Center(
+                                                        child: ElevatedButton(
+                                                          onPressed: () {
+                                                            _editStock(
+                                                              product.data(),
+                                                            );
+                                                          },
+
+                                                          style: ElevatedButton.styleFrom(
+                                                            backgroundColor:
+                                                                Colors.black,
+                                                            foregroundColor:
+                                                                Colors.white,
+                                                            shape: RoundedRectangleBorder(
+                                                              borderRadius:
+                                                                  BorderRadius.circular(
+                                                                    0,
+                                                                  ),
+                                                            ),
+                                                            fixedSize:
+                                                                Size.fromWidth(
+                                                                  110.w,
+                                                                ),
+                                                          ),
+                                                          child: Text(
+                                                            '변경',
+                                                            style: TextStyle(
+                                                              color:
+                                                                  Colors.white,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  TableRow(
+                                                    children: [
+                                                      const Center(
+                                                        child: Text(
+                                                          'Estimated settlement',
+                                                        ),
+                                                      ),
+                                                      Center(
+                                                        child: Text(
+                                                          '₩ ${product['estimatedSettlement']?.toString() ?? 'N/A'}',
+                                                        ),
+                                                      ),
+                                                      Center(child: Text('')),
+                                                    ],
+                                                  ),
+                                                  TableRow(
+                                                    children: [
+                                                      const Center(
+                                                        child: Text(
+                                                          'Estimated settlement date',
+                                                        ),
+                                                      ),
+                                                      Center(
+                                                        child: Text(
+                                                          product['estimatedSettlementDate']
+                                                                  ?.toString() ??
+                                                              'N/A',
+                                                        ),
+                                                      ),
+                                                      Center(child: Text('')),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
+
+                              if (products.length > 1) ...[
+                                // Left scroll button
+                                ValueListenableBuilder<int>(
+                                  valueListenable: _currentIndexNotifier,
+                                  builder: (context, currentIndex, _) {
+                                    return Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        // Left button
+                                        Container(
+                                          width: 48,
+                                          alignment: Alignment.centerLeft,
+                                          child:
+                                              currentIndex > 0
+                                                  ? IconButton(
+                                                    icon: Icon(
+                                                      Icons.arrow_back_ios,
+                                                    ),
+                                                    onPressed:
+                                                        () => _scrollTo(
+                                                          currentIndex - 1,
+                                                        ),
+                                                  )
+                                                  : SizedBox(),
+                                        ),
+
+                                        // Right button
+                                        Container(
+                                          width: 48,
+                                          alignment: Alignment.centerRight,
+                                          child:
+                                              currentIndex < products.length - 1
+                                                  ? IconButton(
+                                                    icon: Icon(
+                                                      Icons.arrow_forward_ios,
+                                                    ),
+                                                    onPressed:
+                                                        () => _scrollTo(
+                                                          currentIndex + 1,
+                                                        ),
+                                                  )
+                                                  : SizedBox(),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                ),
+                              ],
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
             SizedBox(height: 24.h),
@@ -67,17 +533,38 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
               decoration: BoxDecoration(
                 border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
               ),
-              child: Row(
+              child: Table(
+                border: TableBorder.all(color: Colors.black),
+                columnWidths: const {
+                  0: FlexColumnWidth(1), // 제품 (Product)
+                  1: FlexColumnWidth(1), // 수량 (Quantity)
+                  2: FlexColumnWidth(1), // 주문 ID (Order ID)
+                  3: FlexColumnWidth(1), // 수취인 (Recipient)
+                  4: FlexColumnWidth(1), // 주소 (Address)
+                  5: FlexColumnWidth(1), // 배송 요청사항 (Delivery Note)
+                  6: FlexColumnWidth(1), // 택배사 (Courier)
+                  7: FlexColumnWidth(1), // 운송장 번호 (Tracking Number)
+                  8: FlexColumnWidth(1), // Empty (for actions)
+                },
                 children: [
-                  _buildTableHeader('제품', 2),
-                  _buildTableHeader('수량', 1),
-                  _buildTableHeader('주문 ID', 1),
-                  _buildTableHeader('수취인', 1),
-                  _buildTableHeader('주소', 3),
-                  _buildTableHeader('배송 요청사항', 1),
-                  _buildTableHeader('택배사', 1),
-                  _buildTableHeader('운송장 번호', 1),
-                  _buildTableHeader('', 1),
+                  TableRow(
+                    children: [
+                      _buildTableHeader('주문 ID'),
+                      _buildTableHeader('수취인'),
+                      _buildTableHeader('Phone'),
+                      _buildTableHeader('주소'),
+                      _buildTableHeader('배송 요청사항'),
+                      _buildTableHeader('제품'),
+                      _buildTableHeader('수량'),
+                      _buildTableHeader('Supply price'),
+                      _buildTableHeader('Delivery price'),
+                      _buildTableHeader('Shipping fee'),
+                      _buildTableHeader('Estimated settlement'),
+                      _buildTableHeader('택배사'),
+                      _buildTableHeader('운송장 번호'),
+                      _buildTableHeader(''),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -89,7 +576,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                         .collection('orders')
                         .where(
                           'deliveryManagerId',
-                          isEqualTo: FirebaseAuth.instance.currentUser?.uid,
+                          isEqualTo: widget.phoneNumber,
                         )
                         .snapshots(),
                 builder: (context, snapshot) {
@@ -106,6 +593,8 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                     return Center(child: Text('주문이 없습니다'));
                   }
                   return ListView.builder(
+                    shrinkWrap: true,
+                    physics: NeverScrollableScrollPhysics(),
                     itemCount: orders.length,
                     itemBuilder: (context, index) {
                       final order = MyOrder.fromDocument(
@@ -123,12 +612,21 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
     );
   }
 
-  Widget _buildTableHeader(String title, int flex) {
-    return Expanded(
-      flex: flex,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8),
-        child: Text(title, style: TextStyle(fontWeight: FontWeight.bold)),
+  void _scrollTo(int index) {
+    itemScrollController.scrollTo(
+      index: index,
+      duration: Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  Widget _buildTableHeader(String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 4.0),
+      child: Text(
+        text,
+        style: TextStyle(fontWeight: FontWeight.bold),
+        textAlign: TextAlign.center,
       ),
     );
   }
@@ -194,11 +692,14 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
             .doc(order.productId)
             .get(),
       ]),
-
       builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator());
+        }
         if (!snapshot.hasData || snapshot.data == null) {
           return Center(child: Text('사용자가 없습니다'));
         }
+
         final userSnapshot = snapshot.data![0] as DocumentSnapshot;
         final user = MyUser.fromDocument(
           userSnapshot.data() as Map<String, dynamic>,
@@ -211,58 +712,29 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
 
         final trackingNumberController = TextEditingController();
         final deliveryAddressController = TextEditingController();
-        return Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: Colors.grey.shade100,
-            border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                flex: 2,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Row(
-                    children: [
-                      product.imgUrl != null
-                          ? Image.network(
-                            product.imgUrl!,
-                            width: 50,
-                            height: 50,
-                            fit: BoxFit.cover,
-                          )
-                          : Container(
-                            width: 50,
-                            height: 50,
-                            color: Colors.grey.shade300,
-                          ),
-                      SizedBox(width: 16),
-                      Flexible(child: Text(product.productName)),
-                    ],
-                  ),
-                ),
-              ),
-              Expanded(
-                flex: 1,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8.0,
-                    vertical: 8,
-                  ),
-                  child: Text(
-                    order.quantity.toString(),
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16.sp,
-                    ),
-                  ),
-                ),
-              ),
 
-              Expanded(
-                flex: 1,
-                child: Padding(
+        return Table(
+          border: TableBorder.all(color: Colors.black),
+          columnWidths: const {
+            0: FlexColumnWidth(1), // 제품 (Product)
+            1: FlexColumnWidth(1), // 수량 (Quantity)
+            2: FlexColumnWidth(1), // 주문 ID (Order ID)
+            3: FlexColumnWidth(1), // 수취인 (Recipient)
+            4: FlexColumnWidth(1), // 주소 (Address)
+            5: FlexColumnWidth(1), // 배송 요청사항 (Delivery Note)
+            6: FlexColumnWidth(1), // 택배사 (Courier)
+            7: FlexColumnWidth(1), // 운송장 번호 (Tracking Number)
+            8: FlexColumnWidth(1), // Action
+            9: FlexColumnWidth(1), // Action
+            10: FlexColumnWidth(1), // Action
+            11: FlexColumnWidth(1), // Action
+            12: FlexColumnWidth(1), // Action
+          },
+          children: [
+            TableRow(
+              children: [
+                // Order ID Column
+                Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8.0,
                     vertical: 8,
@@ -271,15 +743,15 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                     order.orderId,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 16.sp,
-                      color: Colors.red,
+                      fontSize: 12.sp,
+                      color: Colors.black,
                     ),
+                    textAlign: TextAlign.center,
                   ),
                 ),
-              ),
-              Expanded(
-                flex: 1,
-                child: Padding(
+
+                // Recipient Column
+                Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8.0,
                     vertical: 8,
@@ -288,14 +760,27 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                     user.name,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 16.sp,
+                      fontSize: 12.sp,
                     ),
+                    textAlign: TextAlign.center,
                   ),
                 ),
-              ),
-              Expanded(
-                flex: 3,
-                child: Padding(
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8.0,
+                    vertical: 8,
+                  ),
+                  child: Text(
+                    order.phoneNo,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12.sp,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                // Address Column
+                Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8.0,
                     vertical: 8,
@@ -304,14 +789,13 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                     order.deliveryAddress,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 16.sp,
+                      fontSize: 12.sp,
                     ),
                   ),
                 ),
-              ),
-              Expanded(
-                flex: 1,
-                child: Padding(
+
+                // Delivery Instructions Column
+                Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8.0,
                     vertical: 8,
@@ -320,31 +804,121 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                     order.deliveryInstructions,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 16.sp,
+                      fontSize: 12.sp,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                // Product Column
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16.0,
+                    vertical: 8,
+                  ),
+                  child: Flexible(
+                    child: Text(
+                      product.productName,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12.sp,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
                   ),
                 ),
-              ),
-              Expanded(
-                flex: 1,
-                child: Padding(
+
+                // Quantity Column
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8.0,
+                    vertical: 8,
+                  ),
+                  child: Text(
+                    order.quantity.toString(),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12.sp,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8.0,
+                    vertical: 8,
+                  ),
+                  child: Text(
+                    "₩ ${product.price.toString()}",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12.sp,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8.0,
+                    vertical: 8,
+                  ),
+                  child: Text(
+                    "₩ ${product.deliveryPrice.toString()}",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12.sp,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8.0,
+                    vertical: 8,
+                  ),
+                  child: Text(
+                    "₩ ${product.shippingFee.toString()}",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12.sp,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8.0,
+                    vertical: 8,
+                  ),
+                  child: Text(
+                    "₩ ${product.estimatedSettlement.toString()}",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12.sp,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                // Courier Input Column
+                Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8.0,
                     vertical: 8,
                   ),
                   child: TextField(
                     controller: deliveryAddressController,
-
                     decoration: InputDecoration(
                       labelText: '택배사',
                       border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              Expanded(
-                flex: 1,
-                child: Padding(
+
+                // Tracking Number Input Column
+                Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8.0,
                     vertical: 8,
@@ -354,13 +928,20 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                     decoration: InputDecoration(
                       labelText: '운송장 번호',
                       border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              Flexible(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 5.0),
+
+                // Submit Button Column
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5.0,
+                    vertical: 8,
+                  ),
                   child: ElevatedButton(
                     onPressed: () async {
                       print("pressed");
@@ -371,21 +952,389 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                         ),
                       );
                     },
-
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
+                      backgroundColor: Colors.black,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(0),
                       ),
-                      fixedSize: Size.fromWidth(110.w),
+                      minimumSize: Size(110.w, 40),
                     ),
-                    child: Text('제출'),
+                    child: Text('제출', style: TextStyle(color: Colors.white)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 180,
+            child: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          const Text(': '),
+          Expanded(child: Text(value)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEditableInfoRow(
+    String label,
+    String value, {
+    required VoidCallback onPressed,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 140,
+            child: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          const Text(': '),
+          Expanded(child: Text(value)),
+          IconButton(
+            icon: const Text('Change', style: TextStyle(color: Colors.blue)),
+            onPressed: onPressed,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _editCutoffTime(Map<String, dynamic> product) {
+    final _formKey = GlobalKey<FormState>();
+
+    int baselineTime = product['baselineTime'];
+    String meridiem = product['meridiem'];
+
+    // Actually show the dialog
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text('Edit Product'),
+              content: Container(
+                width: 600,
+                child: Form(
+                  key: _formKey,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: TextFormField(
+                                      initialValue: baselineTime.toString(),
+                                      decoration: InputDecoration(
+                                        labelText: '기준 시간',
+                                      ),
+                                      keyboardType: TextInputType.number,
+                                      validator: (value) {
+                                        if (value == null || value.isEmpty) {
+                                          return '기준 시간을 입력하세요';
+                                        }
+                                        return null;
+                                      },
+                                      onSaved: (value) {
+                                        baselineTime = int.parse(value!);
+                                      },
+                                    ),
+                                  ),
+                                  SizedBox(width: 8),
+                                  DropdownButton<String>(
+                                    value: meridiem,
+                                    items:
+                                        ['AM', 'PM'].map((String value) {
+                                          return DropdownMenuItem<String>(
+                                            value: value,
+                                            child: Text(value),
+                                          );
+                                        }).toList(),
+                                    onChanged: (String? newValue) {
+                                      setDialogState(() {
+                                        meridiem = newValue!;
+                                      });
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ],
-          ),
+              actions: [
+                TextButton(
+                  child: Text('취소'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+                ElevatedButton(
+                  child: Text('저장'),
+                  onPressed: () async {
+                    // Validate and save form first
+                    if (!_formKey.currentState!.validate()) return;
+                    _formKey.currentState!.save();
+                    try {
+                      // Show loading dialog
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder:
+                            (context) => AlertDialog(
+                              content: Row(
+                                children: [
+                                  CircularProgressIndicator(),
+                                  SizedBox(width: 16),
+                                  Text("Updating cutoff time..."),
+                                ],
+                              ),
+                            ),
+                      );
+
+                      // Debug output
+                      print(
+                        "Updating product with ID: ${product['product_id']}",
+                      );
+                      print(
+                        "New values - meridiem: $meridiem, baselineTime: $baselineTime",
+                      );
+
+                      final productRef = FirebaseFirestore.instance
+                          .collection('products')
+                          .doc(product['product_id']);
+
+                      // Verify document exists
+                      final doc = await productRef.get();
+                      if (!doc.exists) {
+                        throw Exception('Product document not found');
+                      }
+
+                      // Debug output
+                      print("Document exists, current data: ${doc.data()}");
+
+                      // Update in Firestore with explicit completion handling
+                      await FirebaseFirestore.instance
+                          .collection('products')
+                          .doc(product['product_id'])
+                          .update({
+                            'meridiem': meridiem,
+                            'baselineTime': baselineTime,
+                          })
+                          .then((_) {
+                            print("Update completed successfully");
+                          })
+                          .catchError((error) {
+                            print("Update failed with error: $error");
+                            throw error; // Re-throw to be caught by the outer catch
+                          });
+
+                      // Close loading dialog
+                      Navigator.of(context).pop();
+
+                      // Close edit dialog
+                      Navigator.of(context).pop();
+
+                      // Show success message
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Cutoff time updated successfully'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    } catch (e) {
+                      print("Error in update process: ${e.toString()}");
+
+                      // Close loading dialog if it's open
+                      if (Navigator.canPop(context)) {
+                        Navigator.of(context).pop();
+                      }
+
+                      // Show detailed error message
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Failed to update cutoff time: ${e.toString()}',
+                          ),
+                          backgroundColor: Colors.red,
+                          duration: Duration(seconds: 5),
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _editStock(Map<String, dynamic> product) {
+    final _formKey = GlobalKey<FormState>();
+
+    // Actually show the dialog
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        // Initialize stock inside the dialog
+        int stock = product['stock'];
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text('Edit Product'),
+              content: Container(
+                width: 600,
+                child: Form(
+                  key: _formKey,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                initialValue: stock.toString(),
+                                decoration: InputDecoration(labelText: '재고'),
+                                keyboardType: TextInputType.number,
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return '재고를 입력하세요';
+                                  }
+                                  return null;
+                                },
+                                onSaved: (value) {
+                                  stock = int.parse(value!);
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  child: Text('취소'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+                ElevatedButton(
+                  child: Text('저장'),
+                  onPressed: () async {
+                    // Validate and save form first
+                    if (!_formKey.currentState!.validate()) return;
+                    _formKey.currentState!.save();
+
+                    try {
+                      // Show loading dialog
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder:
+                            (context) => AlertDialog(
+                              content: Row(
+                                children: [
+                                  CircularProgressIndicator(),
+                                  SizedBox(width: 16),
+                                  Text("Updating stock..."),
+                                ],
+                              ),
+                            ),
+                      );
+
+                      print(
+                        "Updating product with ID: ${product['product_id']}",
+                      );
+                      print("New values - stock: $stock");
+
+                      final productRef = FirebaseFirestore.instance
+                          .collection('products')
+                          .doc(product['product_id']);
+
+                      // Update in Firestore
+                      await productRef
+                          .update({'stock': stock})
+                          .then((_) {
+                            print("Update completed successfully");
+                          })
+                          .catchError((error) {
+                            print("Update failed with error: $error");
+                            throw error;
+                          });
+
+                      // Close loading dialog
+                      Navigator.of(context).pop();
+
+                      // Close edit dialog
+                      Navigator.of(context).pop();
+
+                      // Show success message
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Stock updated successfully'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    } catch (e) {
+                      print("Error in update process: ${e.toString()}");
+
+                      // Close loading dialog if it's open
+                      if (Navigator.canPop(context)) {
+                        Navigator.of(context).pop();
+                      }
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Failed to update stock: ${e.toString()}',
+                          ),
+                          backgroundColor: Colors.red,
+                          duration: Duration(seconds: 5),
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ],
+            );
+          },
         );
       },
     );

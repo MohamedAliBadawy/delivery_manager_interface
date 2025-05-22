@@ -34,7 +34,10 @@ class _LoginScreenState extends State<LoginScreen> {
         // Successful login - navigate to home screen
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => DeliveryManagerInterface()),
+          MaterialPageRoute(
+            builder:
+                (context) => DeliveryManagerInterface(phoneNumber: phoneNumber),
+          ),
         );
       } else {
         ScaffoldMessenger.of(

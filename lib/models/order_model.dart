@@ -17,6 +17,7 @@ class MyOrder {
   String userId;
   String deliveryManagerId;
   String deliveryManager;
+  String phoneNo;
   MyOrder({
     required this.orderId,
     required this.userId,
@@ -34,6 +35,7 @@ class MyOrder {
     required this.trackingNumber,
     required this.deliveryManagerId,
     required this.deliveryManager,
+    required this.phoneNo,
   });
 
   Map<String, Object?> toDocument() {
@@ -54,6 +56,7 @@ class MyOrder {
       'trackingNumber': trackingNumber,
       'deliveryManagerId': deliveryManagerId,
       'deliveryManager': deliveryManager,
+      'phoneNo': phoneNo,
     };
   }
 
@@ -75,6 +78,7 @@ class MyOrder {
       trackingNumber: doc['trackingNumber'] ?? '',
       deliveryManagerId: doc['deliveryManagerId'] ?? '',
       deliveryManager: doc['deliveryManager'] ?? '',
+      phoneNo: doc['phoneNo'] ?? '',
     );
   }
 

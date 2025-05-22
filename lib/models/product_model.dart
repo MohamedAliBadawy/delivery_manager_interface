@@ -25,6 +25,10 @@ class Product {
   final String category;
   final int stock;
   final int price;
+  int? deliveryPrice;
+  int? shippingFee;
+  int? estimatedSettlement;
+  String? estimatedSettlementDate;
   final int baselineTime;
   final List<PricePoint> pricePoints;
   final bool freeShipping;
@@ -42,6 +46,10 @@ class Product {
     required this.instructions,
     required this.stock,
     required this.price,
+    this.deliveryPrice,
+    this.shippingFee,
+    this.estimatedSettlement,
+    this.estimatedSettlementDate,
     required this.baselineTime,
     required this.meridiem,
     required this.imgUrl,
@@ -75,6 +83,10 @@ class Product {
           [],
       freeShipping: map['freeShipping'] ?? false,
       deliveryManagerId: map['deliveryManagerId'] ?? '',
+      deliveryPrice: map['deliveryPrice'] ?? 0,
+      shippingFee: map['shippingFee'] ?? 0,
+      estimatedSettlement: map['estimatedSettlement'] ?? 0,
+      estimatedSettlementDate: map['estimatedSettlementDate'] ?? '',
     );
   }
 
@@ -85,6 +97,10 @@ class Product {
       'instructions': instructions,
       'stock': stock,
       'price': price,
+      'deliveryPrice': deliveryPrice,
+      'shippingFee': shippingFee,
+      'estimatedSettlement': estimatedSettlement,
+      'estimatedSettlementDate': estimatedSettlementDate,
       'baselineTime': baselineTime,
       'meridiem': meridiem,
       'imgUrl': imgUrl,
