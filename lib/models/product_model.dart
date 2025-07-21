@@ -4,7 +4,7 @@ import 'dart:core';
 
 class PricePoint {
   int quantity;
-  int price;
+  double price;
 
   PricePoint({required this.quantity, required this.price});
 
@@ -24,8 +24,10 @@ class Product {
   final String instructions;
   final String category;
   final int stock;
-  final int price;
+  final double price;
+  final int supplyPrice;
   int? deliveryPrice;
+  double? marginRate;
   int? shippingFee;
   int? estimatedSettlement;
   String? estimatedSettlementDate;
@@ -46,7 +48,10 @@ class Product {
     required this.instructions,
     required this.stock,
     required this.price,
+    required this.supplyPrice,
     this.deliveryPrice,
+    this.marginRate,
+
     this.shippingFee,
     this.estimatedSettlement,
     this.estimatedSettlementDate,
@@ -64,6 +69,7 @@ class Product {
       productName: map['productName'] ?? '',
       instructions: map['instructions'] ?? '',
       stock: map['stock'] ?? 0,
+      supplyPrice: map['supplyPrice'] ?? 0,
       price:
           (map['pricePoints'] as List?)
               ?.map((pp) => PricePoint.fromMap(pp))
@@ -84,6 +90,7 @@ class Product {
       freeShipping: map['freeShipping'] ?? false,
       deliveryManagerId: map['deliveryManagerId'] ?? '',
       deliveryPrice: map['deliveryPrice'] ?? 0,
+      marginRate: map['marginRate'] ?? 0,
       shippingFee: map['shippingFee'] ?? 0,
       estimatedSettlement: map['estimatedSettlement'] ?? 0,
       estimatedSettlementDate: map['estimatedSettlementDate'] ?? '',
@@ -97,7 +104,9 @@ class Product {
       'instructions': instructions,
       'stock': stock,
       'price': price,
+      'supplyPrice': supplyPrice,
       'deliveryPrice': deliveryPrice,
+      'marginRate': marginRate,
       'shippingFee': shippingFee,
       'estimatedSettlement': estimatedSettlement,
       'estimatedSettlementDate': estimatedSettlementDate,

@@ -7,7 +7,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'firebase_options.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'login_screen.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -25,9 +24,8 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ScreenUtilInit(
       designSize: const Size(1512, 982),
-
       child: MaterialApp(
-        title: '배달 담당자 인터페이스',
+        title: '판매자',
         theme: ThemeData(
           primarySwatch: Colors.blue,
           scaffoldBackgroundColor: Colors.white,
@@ -52,13 +50,28 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
   final ItemScrollController itemScrollController = ItemScrollController();
   final ItemPositionsListener itemPositionsListener =
       ItemPositionsListener.create();
-
+  late final ScrollController _headerScrollController;
+  late final ScrollController _bodyScrollController;
   final ValueNotifier<int> _currentIndexNotifier = ValueNotifier<int>(0);
 
   @override
   void initState() {
     super.initState();
+    _headerScrollController = ScrollController();
+    _bodyScrollController = ScrollController();
 
+    _headerScrollController.addListener(() {
+      if (_bodyScrollController.hasClients &&
+          _bodyScrollController.offset != _headerScrollController.offset) {
+        _bodyScrollController.jumpTo(_headerScrollController.offset);
+      }
+    });
+    _bodyScrollController.addListener(() {
+      if (_headerScrollController.hasClients &&
+          _headerScrollController.offset != _bodyScrollController.offset) {
+        _headerScrollController.jumpTo(_bodyScrollController.offset);
+      }
+    });
     // Update the notifier value when positions change
     itemPositionsListener.itemPositions.addListener(() {
       final positions = itemPositionsListener.itemPositions.value;
@@ -71,542 +84,554 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
   @override
   void dispose() {
     _currentIndexNotifier.dispose();
+    _headerScrollController.dispose();
+    _bodyScrollController.dispose();
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Padding(
-        padding: EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildManagerInfo() {
+    return FutureBuilder(
+      future:
+          FirebaseFirestore.instance
+              .collection('deliveryManagers')
+              .where('phone', isEqualTo: widget.phoneNumber)
+              .get(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError ||
+            !snapshot.hasData ||
+            snapshot.data!.docs.isEmpty) {
+          return Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text('Manager information not found'),
+          );
+        }
+
+        final manager = snapshot.data!.docs.first.data();
+        return Column(
           children: [
-            IntrinsicHeight(
-              child: Row(
+            Text(
+              'Manage Information',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Table(
+                defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+
+                border: TableBorder.all(width: 2.0, color: Colors.black),
                 children: [
-                  Flexible(
-                    flex: 1,
-                    child: FutureBuilder(
-                      future:
-                          FirebaseFirestore.instance
-                              .collection('deliveryManagers')
-                              .where('phone', isEqualTo: widget.phoneNumber)
-                              .get(),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
-                        }
+                  TableRow(
+                    children: [
+                      Center(child: Text('Name')),
+                      Center(child: Text(manager['name'] ?? 'N/A')),
+                    ],
+                  ),
+                  TableRow(
+                    children: [
+                      Center(child: Text('Phone number')),
+                      Center(child: Text(manager['phone'] ?? 'N/A')),
+                    ],
+                  ),
+                  TableRow(
+                    children: [
+                      Center(child: Text('Email')),
+                      Center(child: Text(manager['email'] ?? 'N/A')),
+                    ],
+                  ),
+                  TableRow(
+                    children: [
+                      Center(child: Text('Banking information')),
+                      Center(child: Text(manager['bankInfo'] ?? 'N/A')),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
-                        if (snapshot.hasError ||
-                            !snapshot.hasData ||
-                            snapshot.data!.docs.isEmpty) {
-                          return Padding(
-                            padding: EdgeInsets.all(16.0),
-                            child: Text('Manager information not found'),
-                          );
-                        }
+  Widget _buildProductsInfo() {
+    return StreamBuilder(
+      stream:
+          FirebaseFirestore.instance
+              .collection('products')
+              .where('deliveryManagerId', isEqualTo: widget.phoneNumber)
+              .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-                        final manager = snapshot.data!.docs.first.data();
-                        return Column(
-                          children: [
-                            Text(
-                              'Manage Information',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
+        if (snapshot.hasError ||
+            !snapshot.hasData ||
+            snapshot.data!.docs.isEmpty) {
+          return Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text('No products found'),
+          );
+        }
+
+        final products = snapshot.data!.docs;
+        return SizedBox(
+          height: 300, // Adjust based on your needs
+          child: Stack(
+            children: [
+              ScrollablePositionedList.builder(
+                itemScrollController: itemScrollController,
+                itemPositionsListener: itemPositionsListener,
+                scrollDirection: Axis.horizontal,
+                itemCount: products.length,
+                itemBuilder: (context, index) {
+                  final product = products[index];
+                  return Row(
+                    children: [
+                      Container(
+                        width: 300, // Fixed width for each product card
+                        margin: const EdgeInsets.only(right: 16),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              const Text(
+                                'Contract Information',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Table(
-                                defaultVerticalAlignment:
-                                    TableCellVerticalAlignment.middle,
-
+                              const SizedBox(height: 16),
+                              Table(
                                 border: TableBorder.all(
-                                  width: 2.0,
+                                  width: 2,
                                   color: Colors.black,
                                 ),
                                 children: [
                                   TableRow(
                                     children: [
-                                      Center(child: Text('Name')),
+                                      const Center(child: Text('Product Name')),
                                       Center(
-                                        child: Text(manager['name'] ?? 'N/A'),
+                                        child: Text(
+                                          product['productName'] ?? 'N/A',
+                                        ),
                                       ),
                                     ],
                                   ),
                                   TableRow(
                                     children: [
-                                      Center(child: Text('Phone number')),
+                                      const Center(child: Text('Supply price')),
                                       Center(
-                                        child: Text(manager['phone'] ?? 'N/A'),
+                                        child: Text(
+                                          '₩${product['price']?.toString() ?? 'N/A'}',
+                                        ),
                                       ),
                                     ],
                                   ),
                                   TableRow(
                                     children: [
-                                      Center(child: Text('Email')),
-                                      Center(
-                                        child: Text(manager['email'] ?? 'N/A'),
-                                      ),
-                                    ],
-                                  ),
-                                  TableRow(
-                                    children: [
-                                      Center(
-                                        child: Text('Banking information'),
+                                      const Center(
+                                        child: Text('Delivery price'),
                                       ),
                                       Center(
                                         child: Text(
-                                          manager['bankInfo'] ?? 'N/A',
+                                          '₩ ${product['deliveryPrice']?.toString() ?? 'N/A'}',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  TableRow(
+                                    children: [
+                                      const Center(
+                                        child: Text(
+                                          'Additional shipping fee for remote',
+                                        ),
+                                      ),
+                                      Center(
+                                        child: Text(
+                                          '₩ ${product['shippingFee']?.toString() ?? 'N/A'}',
                                         ),
                                       ),
                                     ],
                                   ),
                                 ],
                               ),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                  Flexible(
-                    flex: 3,
-                    child: StreamBuilder(
-                      stream:
-                          FirebaseFirestore.instance
-                              .collection('products')
-                              .where(
-                                'deliveryManagerId',
-                                isEqualTo: widget.phoneNumber,
-                              )
-                              .snapshots(),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
-                        }
-
-                        if (snapshot.hasError ||
-                            !snapshot.hasData ||
-                            snapshot.data!.docs.isEmpty) {
-                          return Padding(
-                            padding: EdgeInsets.all(16.0),
-                            child: Text('No products found'),
-                          );
-                        }
-
-                        final products = snapshot.data!.docs;
-                        return SizedBox(
-                          height: 300, // Adjust based on your needs
-                          child: Stack(
+                            ],
+                          ),
+                        ),
+                      ),
+                      Container(
+                        width: 300, // Fixed width for each product card
+                        margin: const EdgeInsets.only(right: 16),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              ScrollablePositionedList.builder(
-                                itemScrollController: itemScrollController,
-                                itemPositionsListener: itemPositionsListener,
-                                scrollDirection: Axis.horizontal,
-                                itemCount: products.length,
-                                itemBuilder: (context, index) {
-                                  final product = products[index];
-                                  return Row(
+                              const Text(
+                                'Order cut-off time/ Stock Management',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Table(
+                                border: TableBorder.all(
+                                  width: 2,
+                                  color: Colors.black,
+                                ),
+                                children: [
+                                  TableRow(
                                     children: [
-                                      Container(
-                                        width:
-                                            300, // Fixed width for each product card
-                                        margin: const EdgeInsets.only(
-                                          right: 16,
-                                        ),
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(16.0),
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.center,
-                                            children: [
-                                              const Text(
-                                                'Contract Information',
-                                                style: TextStyle(
-                                                  fontSize: 18,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 16),
-                                              Table(
-                                                border: TableBorder.all(
-                                                  width: 2,
-                                                  color: Colors.black,
-                                                ),
-                                                children: [
-                                                  TableRow(
-                                                    children: [
-                                                      const Center(
-                                                        child: Text(
-                                                          'Product Name',
-                                                        ),
-                                                      ),
-                                                      Center(
-                                                        child: Text(
-                                                          product['productName'] ??
-                                                              'N/A',
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  TableRow(
-                                                    children: [
-                                                      const Center(
-                                                        child: Text(
-                                                          'Supply price',
-                                                        ),
-                                                      ),
-                                                      Center(
-                                                        child: Text(
-                                                          '₩${product['price']?.toString() ?? 'N/A'}',
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  TableRow(
-                                                    children: [
-                                                      const Center(
-                                                        child: Text(
-                                                          'Delivery price',
-                                                        ),
-                                                      ),
-                                                      Center(
-                                                        child: Text(
-                                                          '₩ ${product['deliveryPrice']?.toString() ?? 'N/A'}',
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  TableRow(
-                                                    children: [
-                                                      const Center(
-                                                        child: Text(
-                                                          'Additional shipping fee for remote',
-                                                        ),
-                                                      ),
-                                                      Center(
-                                                        child: Text(
-                                                          '₩ ${product['shippingFee']?.toString() ?? 'N/A'}',
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
-                                          ),
+                                      const Center(
+                                        child: Text('Order cut-off time'),
+                                      ),
+                                      Center(
+                                        child: Text(
+                                          '${product['baselineTime']?.toString() ?? 'N/A'} ${product['meridiem'] ?? 'N/A'}',
                                         ),
                                       ),
-                                      Container(
-                                        width:
-                                            300, // Fixed width for each product card
-                                        margin: const EdgeInsets.only(
-                                          right: 16,
-                                        ),
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(16.0),
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.center,
-                                            children: [
-                                              const Text(
-                                                'Order cut-off time/ Stock Management',
-                                                style: TextStyle(
-                                                  fontSize: 18,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                              Table(
-                                                border: TableBorder.all(
-                                                  width: 2,
-                                                  color: Colors.black,
-                                                ),
-                                                children: [
-                                                  TableRow(
-                                                    children: [
-                                                      const Center(
-                                                        child: Text(
-                                                          'Order cut-off time',
-                                                        ),
-                                                      ),
-                                                      Center(
-                                                        child: Text(
-                                                          '${product['baselineTime']?.toString() ?? 'N/A'} ${product['meridiem'] ?? 'N/A'}',
-                                                        ),
-                                                      ),
-                                                      Center(
-                                                        child: ElevatedButton(
-                                                          onPressed: () {
-                                                            _editCutoffTime(
-                                                              product.data(),
-                                                            );
-                                                          },
+                                      Center(
+                                        child: ElevatedButton(
+                                          onPressed: () {
+                                            _editCutoffTime(product.data());
+                                          },
 
-                                                          style: ElevatedButton.styleFrom(
-                                                            backgroundColor:
-                                                                Colors.black,
-                                                            foregroundColor:
-                                                                Colors.white,
-                                                            shape: RoundedRectangleBorder(
-                                                              borderRadius:
-                                                                  BorderRadius.circular(
-                                                                    0,
-                                                                  ),
-                                                            ),
-                                                            fixedSize:
-                                                                Size.fromWidth(
-                                                                  110.w,
-                                                                ),
-                                                          ),
-                                                          child: Text(
-                                                            '변경',
-                                                            style: TextStyle(
-                                                              color:
-                                                                  Colors.white,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  TableRow(
-                                                    children: [
-                                                      const Center(
-                                                        child: Text(
-                                                          'Current stock',
-                                                        ),
-                                                      ),
-                                                      Center(
-                                                        child: Text(
-                                                          product['stock']
-                                                                  ?.toString() ??
-                                                              'N/A',
-                                                        ),
-                                                      ),
-                                                      Center(
-                                                        child: ElevatedButton(
-                                                          onPressed: () {
-                                                            _editStock(
-                                                              product.data(),
-                                                            );
-                                                          },
-
-                                                          style: ElevatedButton.styleFrom(
-                                                            backgroundColor:
-                                                                Colors.black,
-                                                            foregroundColor:
-                                                                Colors.white,
-                                                            shape: RoundedRectangleBorder(
-                                                              borderRadius:
-                                                                  BorderRadius.circular(
-                                                                    0,
-                                                                  ),
-                                                            ),
-                                                            fixedSize:
-                                                                Size.fromWidth(
-                                                                  110.w,
-                                                                ),
-                                                          ),
-                                                          child: Text(
-                                                            '변경',
-                                                            style: TextStyle(
-                                                              color:
-                                                                  Colors.white,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  TableRow(
-                                                    children: [
-                                                      const Center(
-                                                        child: Text(
-                                                          'Estimated settlement',
-                                                        ),
-                                                      ),
-                                                      Center(
-                                                        child: Text(
-                                                          '₩ ${product['estimatedSettlement']?.toString() ?? 'N/A'}',
-                                                        ),
-                                                      ),
-                                                      Center(child: Text('')),
-                                                    ],
-                                                  ),
-                                                  TableRow(
-                                                    children: [
-                                                      const Center(
-                                                        child: Text(
-                                                          'Estimated settlement date',
-                                                        ),
-                                                      ),
-                                                      Center(
-                                                        child: Text(
-                                                          product['estimatedSettlementDate']
-                                                                  ?.toString() ??
-                                                              'N/A',
-                                                        ),
-                                                      ),
-                                                      Center(child: Text('')),
-                                                    ],
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.black,
+                                            foregroundColor: Colors.white,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(0),
+                                            ),
+                                            fixedSize: Size.fromWidth(110.w),
+                                          ),
+                                          child: Text(
+                                            '변경',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                            ),
                                           ),
                                         ),
                                       ),
                                     ],
-                                  );
-                                },
+                                  ),
+                                  TableRow(
+                                    children: [
+                                      const Center(
+                                        child: Text('Current stock'),
+                                      ),
+                                      Center(
+                                        child: Text(
+                                          product['stock']?.toString() ?? 'N/A',
+                                        ),
+                                      ),
+                                      Center(
+                                        child: ElevatedButton(
+                                          onPressed: () {
+                                            _editStock(product.data());
+                                          },
+
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.black,
+                                            foregroundColor: Colors.white,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(0),
+                                            ),
+                                            fixedSize: Size.fromWidth(110.w),
+                                          ),
+                                          child: Text(
+                                            '변경',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  TableRow(
+                                    children: [
+                                      const Center(
+                                        child: Text('Estimated settlement'),
+                                      ),
+                                      Center(
+                                        child: Text(
+                                          '₩ ${product['estimatedSettlement']?.toString() ?? 'N/A'}',
+                                        ),
+                                      ),
+                                      Center(child: Text('')),
+                                    ],
+                                  ),
+                                  TableRow(
+                                    children: [
+                                      const Center(
+                                        child: Text(
+                                          'Estimated settlement date',
+                                        ),
+                                      ),
+                                      Center(
+                                        child: Text(
+                                          product['estimatedSettlementDate']
+                                                  ?.toString() ??
+                                              'N/A',
+                                        ),
+                                      ),
+                                      Center(child: Text('')),
+                                    ],
+                                  ),
+                                ],
                               ),
-
-                              if (products.length > 1) ...[
-                                // Left scroll button
-                                ValueListenableBuilder<int>(
-                                  valueListenable: _currentIndexNotifier,
-                                  builder: (context, currentIndex, _) {
-                                    return Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        // Left button
-                                        Container(
-                                          width: 48,
-                                          alignment: Alignment.centerLeft,
-                                          child:
-                                              currentIndex > 0
-                                                  ? IconButton(
-                                                    icon: Icon(
-                                                      Icons.arrow_back_ios,
-                                                    ),
-                                                    onPressed:
-                                                        () => _scrollTo(
-                                                          currentIndex - 1,
-                                                        ),
-                                                  )
-                                                  : SizedBox(),
-                                        ),
-
-                                        // Right button
-                                        Container(
-                                          width: 48,
-                                          alignment: Alignment.centerRight,
-                                          child:
-                                              currentIndex < products.length - 1
-                                                  ? IconButton(
-                                                    icon: Icon(
-                                                      Icons.arrow_forward_ios,
-                                                    ),
-                                                    onPressed:
-                                                        () => _scrollTo(
-                                                          currentIndex + 1,
-                                                        ),
-                                                  )
-                                                  : SizedBox(),
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                ),
-                              ],
                             ],
                           ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: 24.h),
-            Container(
-              decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
-              ),
-              child: Table(
-                border: TableBorder.all(color: Colors.black),
-                columnWidths: const {
-                  0: FlexColumnWidth(1), // 제품 (Product)
-                  1: FlexColumnWidth(1), // 수량 (Quantity)
-                  2: FlexColumnWidth(1), // 주문 ID (Order ID)
-                  3: FlexColumnWidth(1), // 수취인 (Recipient)
-                  4: FlexColumnWidth(1), // 주소 (Address)
-                  5: FlexColumnWidth(1), // 배송 요청사항 (Delivery Note)
-                  6: FlexColumnWidth(1), // 택배사 (Courier)
-                  7: FlexColumnWidth(1), // 운송장 번호 (Tracking Number)
-                  8: FlexColumnWidth(1), // Empty (for actions)
-                },
-                children: [
-                  TableRow(
-                    children: [
-                      _buildTableHeader('주문 ID'),
-                      _buildTableHeader('수취인'),
-                      _buildTableHeader('Phone'),
-                      _buildTableHeader('주소'),
-                      _buildTableHeader('배송 요청사항'),
-                      _buildTableHeader('제품'),
-                      _buildTableHeader('수량'),
-                      _buildTableHeader('Supply price'),
-                      _buildTableHeader('Delivery price'),
-                      _buildTableHeader('Shipping fee'),
-                      _buildTableHeader('Estimated settlement'),
-                      _buildTableHeader('택배사'),
-                      _buildTableHeader('운송장 번호'),
-                      _buildTableHeader(''),
+                        ),
+                      ),
                     ],
-                  ),
-                ],
-              ),
-            ),
-
-            Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream:
-                    FirebaseFirestore.instance
-                        .collection('orders')
-                        .where(
-                          'deliveryManagerId',
-                          isEqualTo: widget.phoneNumber,
-                        )
-                        .snapshots(),
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  }
-                  // 3. Check for null data
-                  if (!snapshot.hasData || snapshot.data == null) {
-                    return Center(child: Text('주문이 없습니다'));
-                  }
-                  final orders = snapshot.data!.docs;
-
-                  if (orders.isEmpty) {
-                    return Center(child: Text('주문이 없습니다'));
-                  }
-                  return ListView.builder(
-                    shrinkWrap: true,
-                    physics: NeverScrollableScrollPhysics(),
-                    itemCount: orders.length,
-                    itemBuilder: (context, index) {
-                      final order = MyOrder.fromDocument(
-                        orders[index].data() as Map<String, dynamic>,
-                      );
-                      return _buildOrderRow(order);
-                    },
                   );
                 },
               ),
-            ),
-          ],
+
+              if (products.length > 1) ...[
+                // Left scroll button
+                ValueListenableBuilder<int>(
+                  valueListenable: _currentIndexNotifier,
+                  builder: (context, currentIndex, _) {
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Left button
+                        Container(
+                          width: 48,
+                          alignment: Alignment.centerLeft,
+                          child:
+                              currentIndex > 0
+                                  ? IconButton(
+                                    icon: Icon(Icons.arrow_back_ios),
+                                    onPressed:
+                                        () => _scrollTo(currentIndex - 1),
+                                  )
+                                  : SizedBox(),
+                        ),
+
+                        // Right button
+                        Container(
+                          width: 48,
+                          alignment: Alignment.centerRight,
+                          child:
+                              currentIndex < products.length - 1
+                                  ? IconButton(
+                                    icon: Icon(Icons.arrow_forward_ios),
+                                    onPressed:
+                                        () => _scrollTo(currentIndex + 1),
+                                  )
+                                  : SizedBox(),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> registerTrackingManually(
+    String carrierId,
+    String trackingNumber,
+    MyOrder order,
+  ) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('orders')
+          .doc(order.orderId)
+          .update({'trackingNumber': trackingNumber, 'carrierId': carrierId});
+      final callbackUrl = 'https://trackingwebhook-nlc5xkd7oa-uc.a.run.app/';
+      final expirationTime =
+          DateTime.now().add(Duration(hours: 48)).toUtc().toIso8601String();
+
+      final response = await http.post(
+        Uri.parse('https://apis.tracker.delivery/graphql'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization':
+              'TRACKQL-API-KEY 6fvqe192p5v5ik6p5aev1ntud4:1eh63r90t9mms8be76r2npve71fcoeqi70e5pud3ve2vfvtdietd',
+        },
+        body: json.encode({
+          "query":
+              "mutation RegisterTrackWebhook(\$input: RegisterTrackWebhookInput!) { registerTrackWebhook(input: \$input) }",
+          "variables": {
+            "input": {
+              "carrierId": carrierId,
+              "trackingNumber": trackingNumber,
+              "callbackUrl": callbackUrl,
+              "expirationTime": expirationTime,
+            },
+          },
+        }),
+      );
+
+      // Parse the response
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200 && !responseData.containsKey('errors')) {
+        print(responseData);
+        return {'success': true};
+      } else {
+        final errorMessage =
+            responseData['errors'] != null
+                ? responseData['errors'][0]['message']
+                : 'Failed to register tracking webhook';
+        return {'success': false, 'error': errorMessage};
+      }
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  final Map<int, TableColumnWidth> _columnWidths = {
+    0: FlexColumnWidth(1), // Order ID
+    1: FlexColumnWidth(1), // Recipient
+    2: FlexColumnWidth(1), // Phone
+    3: FlexColumnWidth(1), // Address
+    4: FlexColumnWidth(1), // Delivery Note
+    5: FlexColumnWidth(1), // Product
+    6: FlexColumnWidth(1), // Quantity
+    7: FlexColumnWidth(1), // Supply price
+    8: FlexColumnWidth(1), // Delivery price
+    9: FlexColumnWidth(1), // Shipping fee
+    10: FlexColumnWidth(1), // Estimated settlement
+    11: FlexColumnWidth(1), // Courier
+    12: FlexColumnWidth(1), // Tracking Number
+    13: FlexColumnWidth(1.5), // Submit Button (wider)
+  };
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              IntrinsicHeight(
+                child:
+                    MediaQuery.of(context).size.width < 800
+                        ? Column(
+                          children: [
+                            // Manager Information
+                            _buildManagerInfo(),
+                            SizedBox(height: 20),
+                            // Products Information
+                            _buildProductsInfo(),
+                          ],
+                        )
+                        : Row(
+                          children: [
+                            Flexible(flex: 1, child: _buildManagerInfo()),
+                            Flexible(flex: 3, child: _buildProductsInfo()),
+                          ],
+                        ),
+              ),
+              SizedBox(height: 24.h),
+              SizedBox(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  controller: _headerScrollController,
+                  child: Container(
+                    width: 1800, // adjust to fit all columns
+
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(color: Colors.grey.shade300),
+                      ),
+                    ),
+                    child: Table(
+                      border: TableBorder.all(color: Colors.black),
+                      columnWidths: _columnWidths,
+                      children: [
+                        TableRow(
+                          children: [
+                            _buildTableHeader('주문 ID'),
+                            _buildTableHeader('수취인'),
+                            _buildTableHeader('Phone'),
+                            _buildTableHeader('주소'),
+                            _buildTableHeader('배송 요청사항'),
+                            _buildTableHeader('제품'),
+                            _buildTableHeader('수량'),
+                            _buildTableHeader('Supply price'),
+                            _buildTableHeader('Delivery price'),
+                            _buildTableHeader('Shipping fee'),
+                            _buildTableHeader('Estimated settlement'),
+                            _buildTableHeader('택배사'),
+                            _buildTableHeader('운송장 번호'),
+                            _buildTableHeader(''),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              SizedBox(
+                height: 400, // adjust as needed for table body
+
+                child: StreamBuilder<QuerySnapshot>(
+                  stream:
+                      FirebaseFirestore.instance
+                          .collection('orders')
+                          .where(
+                            'deliveryManagerId',
+                            isEqualTo: widget.phoneNumber,
+                          )
+                          .snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return Center(child: Text('Error: ${snapshot.error}'));
+                    }
+                    // 3. Check for null data
+                    if (!snapshot.hasData || snapshot.data == null) {
+                      return Center(child: Text('주문이 없습니다'));
+                    }
+                    final orders = snapshot.data!.docs;
+
+                    if (orders.isEmpty) {
+                      return Center(child: Text('주문이 없습니다'));
+                    }
+                    return Scrollbar(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        controller: _bodyScrollController,
+                        child: SizedBox(
+                          width: 1800, // match header width
+
+                          child: ListView.builder(
+                            itemCount: orders.length,
+                            itemBuilder: (context, index) {
+                              final order = MyOrder.fromDocument(
+                                orders[index].data() as Map<String, dynamic>,
+                              );
+                              return _buildOrderRow(order);
+                            },
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -632,58 +657,6 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
   }
 
   Widget _buildOrderRow(MyOrder order) {
-    Future<Map<String, dynamic>> _registerTrackingManually(
-      String carrierId,
-      String trackingNumber,
-    ) async {
-      try {
-        await FirebaseFirestore.instance
-            .collection('orders')
-            .doc(order.orderId)
-            .update({'trackingNumber': trackingNumber, 'carrierId': carrierId});
-        final callbackUrl = 'https://trackingwebhook-nlc5xkd7oa-uc.a.run.app/';
-        final expirationTime =
-            DateTime.now().add(Duration(hours: 48)).toUtc().toIso8601String();
-
-        final response = await http.post(
-          Uri.parse('https://apis.tracker.delivery/graphql'),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization':
-                'TRACKQL-API-KEY 6fvqe192p5v5ik6p5aev1ntud4:1eh63r90t9mms8be76r2npve71fcoeqi70e5pud3ve2vfvtdietd',
-          },
-          body: json.encode({
-            "query":
-                "mutation RegisterTrackWebhook(\$input: RegisterTrackWebhookInput!) { registerTrackWebhook(input: \$input) }",
-            "variables": {
-              "input": {
-                "carrierId": carrierId,
-                "trackingNumber": trackingNumber,
-                "callbackUrl": callbackUrl,
-                "expirationTime": expirationTime,
-              },
-            },
-          }),
-        );
-
-        // Parse the response
-        final responseData = json.decode(response.body);
-
-        if (response.statusCode == 200 && !responseData.containsKey('errors')) {
-          print(responseData);
-          return {'success': true};
-        } else {
-          final errorMessage =
-              responseData['errors'] != null
-                  ? responseData['errors'][0]['message']
-                  : 'Failed to register tracking webhook';
-          return {'success': false, 'error': errorMessage};
-        }
-      } catch (e) {
-        return {'success': false, 'error': e.toString()};
-      }
-    }
-
     return FutureBuilder(
       future: Future.wait([
         FirebaseFirestore.instance.collection('users').doc(order.userId).get(),
@@ -715,21 +688,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
 
         return Table(
           border: TableBorder.all(color: Colors.black),
-          columnWidths: const {
-            0: FlexColumnWidth(1), // 제품 (Product)
-            1: FlexColumnWidth(1), // 수량 (Quantity)
-            2: FlexColumnWidth(1), // 주문 ID (Order ID)
-            3: FlexColumnWidth(1), // 수취인 (Recipient)
-            4: FlexColumnWidth(1), // 주소 (Address)
-            5: FlexColumnWidth(1), // 배송 요청사항 (Delivery Note)
-            6: FlexColumnWidth(1), // 택배사 (Courier)
-            7: FlexColumnWidth(1), // 운송장 번호 (Tracking Number)
-            8: FlexColumnWidth(1), // Action
-            9: FlexColumnWidth(1), // Action
-            10: FlexColumnWidth(1), // Action
-            11: FlexColumnWidth(1), // Action
-            12: FlexColumnWidth(1), // Action
-          },
+          columnWidths: _columnWidths,
           children: [
             TableRow(
               children: [
@@ -743,7 +702,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                     order.orderId,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 12.sp,
+                      fontSize: 12,
                       color: Colors.black,
                     ),
                     textAlign: TextAlign.center,
@@ -758,10 +717,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                   ),
                   child: Text(
                     user.name,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12.sp,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -772,10 +728,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                   ),
                   child: Text(
                     order.phoneNo,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12.sp,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -787,10 +740,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                   ),
                   child: Text(
                     order.deliveryAddress,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12.sp,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                   ),
                 ),
 
@@ -802,10 +752,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                   ),
                   child: Text(
                     order.deliveryInstructions,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12.sp,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -815,15 +762,10 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                     horizontal: 16.0,
                     vertical: 8,
                   ),
-                  child: Flexible(
-                    child: Text(
-                      product.productName,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12.sp,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
+                  child: Text(
+                    product.productName,
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    textAlign: TextAlign.center,
                   ),
                 ),
 
@@ -835,10 +777,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                   ),
                   child: Text(
                     order.quantity.toString(),
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12.sp,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -849,10 +788,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                   ),
                   child: Text(
                     "₩ ${product.price.toString()}",
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12.sp,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -863,10 +799,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                   ),
                   child: Text(
                     "₩ ${product.deliveryPrice.toString()}",
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12.sp,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -877,10 +810,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                   ),
                   child: Text(
                     "₩ ${product.shippingFee.toString()}",
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12.sp,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -891,10 +821,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                   ),
                   child: Text(
                     "₩ ${product.estimatedSettlement.toString()}",
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12.sp,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -946,9 +873,10 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                     onPressed: () async {
                       print("pressed");
                       print(
-                        await _registerTrackingManually(
+                        await registerTrackingManually(
                           deliveryAddressController.text,
                           trackingNumberController.text,
+                          order,
                         ),
                       );
                     },
