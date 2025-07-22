@@ -1,7 +1,12 @@
+import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delivery_manager_interface/models/order_model.dart';
 import 'package:delivery_manager_interface/models/product_model.dart';
 import 'package:delivery_manager_interface/models/user_model.dart';
+import 'package:excel/excel.dart' hide Border;
+import 'package:file_picker/file_picker.dart';
+import 'package:file_saver/file_saver.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -53,6 +58,8 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
   late final ScrollController _headerScrollController;
   late final ScrollController _bodyScrollController;
   final ValueNotifier<int> _currentIndexNotifier = ValueNotifier<int>(0);
+  final Map<String, TextEditingController> trackingControllers = {};
+  final Map<String, TextEditingController> courierControllers = {};
 
   @override
   void initState() {
@@ -357,7 +364,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                                       ),
                                     ],
                                   ),
-                                  TableRow(
+                                  /* TableRow(
                                     children: [
                                       const Center(
                                         child: Text('Estimated settlement'),
@@ -386,7 +393,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                                       ),
                                       Center(child: Text('')),
                                     ],
-                                  ),
+                                  ), */
                                 ],
                               ),
                             ],
@@ -442,6 +449,114 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
           ),
         );
       },
+    );
+  }
+
+  Future<void> _downloadOrdersAsExcel() async {
+    final querySnapshot =
+        await FirebaseFirestore.instance
+            .collection('orders')
+            .where('deliveryManagerId', isEqualTo: widget.phoneNumber)
+            .get();
+
+    final excel = Excel.createExcel();
+    final sheet = excel['Sheet1'];
+
+    // Header row
+    sheet.appendRow([
+      TextCellValue('주문 ID'),
+      TextCellValue('수취인'),
+      TextCellValue('Phone'),
+      TextCellValue('주소'),
+      TextCellValue('배송 요청사항'),
+      TextCellValue('제품'),
+      TextCellValue('수량'),
+      TextCellValue('Supply price'),
+      TextCellValue('Delivery price'),
+      TextCellValue('Shipping fee'),
+      TextCellValue('택배사'),
+      TextCellValue('운송장 번호'),
+    ]);
+
+    for (var doc in querySnapshot.docs) {
+      final order = MyOrder.fromDocument(doc.data());
+
+      // Fetch user and product info
+      final userSnapshot =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(order.userId)
+              .get();
+      final user =
+          userSnapshot.exists
+              ? MyUser.fromDocument(userSnapshot.data() as Map<String, dynamic>)
+              : null;
+
+      final productSnapshot =
+          await FirebaseFirestore.instance
+              .collection('products')
+              .doc(order.productId)
+              .get();
+      final product =
+          productSnapshot.exists
+              ? Product.fromMap(productSnapshot.data() as Map<String, dynamic>)
+              : null;
+
+      sheet.appendRow([
+        TextCellValue(order.orderId),
+        TextCellValue(user?.name ?? ''),
+        TextCellValue(order.phoneNo),
+        TextCellValue(order.deliveryAddress),
+        TextCellValue(order.deliveryInstructions),
+        TextCellValue(product?.productName ?? ''),
+        TextCellValue(order.quantity.toString()),
+        TextCellValue(product?.supplyPrice?.toString() ?? ''),
+        TextCellValue(product?.deliveryPrice?.toString() ?? ''),
+        TextCellValue(product?.shippingFee?.toString() ?? ''),
+        TextCellValue(order.courier),
+        TextCellValue(order.trackingNumber),
+      ]);
+    }
+
+    final fileBytes = excel.encode();
+    if (fileBytes != null) {
+      await FileSaver.instance.saveFile(
+        name: 'orders.xlsx',
+        bytes: Uint8List.fromList(fileBytes),
+      );
+    }
+  }
+
+  Future<void> _uploadTrackingExcel() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['xlsx'],
+    );
+    if (result == null || result.files.isEmpty) return;
+
+    final bytes = result.files.first.bytes;
+    if (bytes == null) return;
+
+    final excel = Excel.decodeBytes(bytes);
+
+    final sheet = excel['Sheet1'];
+    for (var row in sheet.rows.skip(1)) {
+      final orderId = row[0]?.value?.toString();
+      final trackingNumber = row[11]?.value?.toString();
+      final courierId = row[10]?.value?.toString();
+
+      if (orderId != null) {
+        if (trackingNumber != null) {
+          trackingControllers[orderId]?.text = trackingNumber;
+        }
+        if (courierId != null) {
+          courierControllers[orderId]?.text = courierId;
+        }
+      }
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Tracking numbers loaded into fields!')),
     );
   }
 
@@ -509,10 +624,11 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
     7: FlexColumnWidth(1), // Supply price
     8: FlexColumnWidth(1), // Delivery price
     9: FlexColumnWidth(1), // Shipping fee
-    10: FlexColumnWidth(1), // Estimated settlement
-    11: FlexColumnWidth(1), // Courier
-    12: FlexColumnWidth(1), // Tracking Number
-    13: FlexColumnWidth(1.5), // Submit Button (wider)
+    /*     10: FlexColumnWidth(1), // Estimated settlement
+ */
+    10: FlexColumnWidth(1), // Courier
+    11: FlexColumnWidth(1), // Tracking Number
+    12: FlexColumnWidth(1.5), // Submit Button (wider)
   };
   @override
   Widget build(BuildContext context) {
@@ -543,6 +659,36 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                         ),
               ),
               SizedBox(height: 24.h),
+              Row(
+                children: [
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(0),
+                      ),
+                      minimumSize: Size(110.w, 40),
+                    ),
+                    onPressed: _downloadOrdersAsExcel,
+                    child: Text('Download Orders as Excel'),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(0),
+                      ),
+                      minimumSize: Size(110.w, 40),
+                    ),
+                    onPressed: _uploadTrackingExcel,
+                    child: Text(
+                      'Upload Courier id and Tracking numbers from excel',
+                    ),
+                  ),
+                ],
+              ),
               SizedBox(
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
@@ -571,7 +717,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                             _buildTableHeader('Supply price'),
                             _buildTableHeader('Delivery price'),
                             _buildTableHeader('Shipping fee'),
-                            _buildTableHeader('Estimated settlement'),
+                            /*  _buildTableHeader('Estimated settlement'), */
                             _buildTableHeader('택배사'),
                             _buildTableHeader('운송장 번호'),
                             _buildTableHeader(''),
@@ -683,8 +829,15 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
           productSnapshot.data() as Map<String, dynamic>,
         );
 
-        final trackingNumberController = TextEditingController();
-        final deliveryAddressController = TextEditingController();
+        // Use or create controllers for this order
+        final trackingNumberController = trackingControllers.putIfAbsent(
+          order.orderId,
+          () => TextEditingController(),
+        );
+        final courierIdController = courierControllers.putIfAbsent(
+          order.orderId,
+          () => TextEditingController(),
+        );
 
         return Table(
           border: TableBorder.all(color: Colors.black),
@@ -814,7 +967,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                     textAlign: TextAlign.center,
                   ),
                 ),
-                Padding(
+                /*                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8.0,
                     vertical: 8,
@@ -824,7 +977,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                     textAlign: TextAlign.center,
                   ),
-                ),
+                ), */
                 // Courier Input Column
                 Padding(
                   padding: const EdgeInsets.symmetric(
@@ -832,7 +985,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                     vertical: 8,
                   ),
                   child: TextField(
-                    controller: deliveryAddressController,
+                    controller: courierIdController,
                     decoration: InputDecoration(
                       labelText: '택배사',
                       border: OutlineInputBorder(),
@@ -871,10 +1024,9 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                   ),
                   child: ElevatedButton(
                     onPressed: () async {
-                      print("pressed");
                       print(
                         await registerTrackingManually(
-                          deliveryAddressController.text,
+                          courierIdController.text,
                           trackingNumberController.text,
                           order,
                         ),
