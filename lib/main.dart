@@ -694,7 +694,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                   scrollDirection: Axis.horizontal,
                   controller: _headerScrollController,
                   child: Container(
-                    width: 1800, // adjust to fit all columns
+                    width: 1600,
 
                     decoration: BoxDecoration(
                       border: Border(
@@ -754,22 +754,20 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                     if (orders.isEmpty) {
                       return Center(child: Text('주문이 없습니다'));
                     }
-                    return Scrollbar(
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        controller: _bodyScrollController,
-                        child: SizedBox(
-                          width: 1800, // match header width
+                    return SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      controller: _bodyScrollController,
+                      child: SizedBox(
+                        width: 1600,
 
-                          child: ListView.builder(
-                            itemCount: orders.length,
-                            itemBuilder: (context, index) {
-                              final order = MyOrder.fromDocument(
-                                orders[index].data() as Map<String, dynamic>,
-                              );
-                              return _buildOrderRow(order);
-                            },
-                          ),
+                        child: ListView.builder(
+                          itemCount: orders.length,
+                          itemBuilder: (context, index) {
+                            final order = MyOrder.fromDocument(
+                              orders[index].data() as Map<String, dynamic>,
+                            );
+                            return _buildOrderRow(order);
+                          },
                         ),
                       ),
                     );
