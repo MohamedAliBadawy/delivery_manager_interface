@@ -457,6 +457,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
         await FirebaseFirestore.instance
             .collection('orders')
             .where('deliveryManagerId', isEqualTo: widget.phoneNumber)
+            .where('confirmed', isEqualTo: true)
             .get();
 
     final excel = Excel.createExcel();
@@ -546,11 +547,19 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
       final courierId = row[10]?.value?.toString();
 
       if (orderId != null) {
-        if (trackingNumber != null) {
-          trackingControllers[orderId]?.text = trackingNumber;
-        }
-        if (courierId != null) {
-          courierControllers[orderId]?.text = courierId;
+        // Check if order is confirmed before updating controllers
+        final orderDoc =
+            await FirebaseFirestore.instance
+                .collection('orders')
+                .doc(orderId)
+                .get();
+        if (orderDoc.exists && (orderDoc.data()?['confirmed'] == true)) {
+          if (trackingNumber != null) {
+            trackingControllers[orderId]?.text = trackingNumber;
+          }
+          if (courierId != null) {
+            courierControllers[orderId]?.text = courierId;
+          }
         }
       }
     }
@@ -810,9 +819,6 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
             .get(),
       ]),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
-        }
         if (!snapshot.hasData || snapshot.data == null) {
           return Center(child: Text('사용자가 없습니다'));
         }
@@ -983,6 +989,8 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                     vertical: 8,
                   ),
                   child: TextField(
+                    enabled: order.confirmed,
+
                     controller: courierIdController,
                     decoration: InputDecoration(
                       labelText: '택배사',
@@ -1002,6 +1010,8 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                     vertical: 8,
                   ),
                   child: TextField(
+                    enabled: order.confirmed,
+
                     controller: trackingNumberController,
                     decoration: InputDecoration(
                       labelText: '운송장 번호',
@@ -1021,15 +1031,18 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                     vertical: 8,
                   ),
                   child: ElevatedButton(
-                    onPressed: () async {
-                      print(
-                        await registerTrackingManually(
-                          courierIdController.text,
-                          trackingNumberController.text,
-                          order,
-                        ),
-                      );
-                    },
+                    onPressed:
+                        order.confirmed
+                            ? () async {
+                              print(
+                                await registerTrackingManually(
+                                  courierIdController.text,
+                                  trackingNumberController.text,
+                                  order,
+                                ),
+                              );
+                            }
+                            : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.black,
                       foregroundColor: Colors.white,
@@ -1039,6 +1052,34 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                       minimumSize: Size(110.w, 40),
                     ),
                     child: Text('제출', style: TextStyle(color: Colors.white)),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5.0,
+                    vertical: 8,
+                  ),
+                  child: ElevatedButton(
+                    onPressed:
+                        order.confirmed
+                            ? null
+                            : () async {
+                              await FirebaseFirestore.instance
+                                  .collection('orders')
+                                  .doc(order.orderId)
+                                  .update({'confirmed': true});
+                            },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(0),
+                      ),
+                    ),
+                    child: Text(
+                      order.confirmed ? 'Confirmed' : 'Confirm',
+                      style: TextStyle(color: Colors.white),
+                    ),
                   ),
                 ),
               ],
