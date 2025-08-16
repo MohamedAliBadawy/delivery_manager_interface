@@ -669,6 +669,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
               ),
               SizedBox(height: 24.h),
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(

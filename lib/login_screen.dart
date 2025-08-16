@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delivery_manager_interface/main.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -11,8 +12,10 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -20,13 +23,20 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final phoneNumber = _phoneController.text.trim();
+      final email = _emailController.text.trim();
+      final password = _passwordController.text.trim();
 
-      // Check if phone exists in delivery managers collection
+      // Sign in with Firebase Auth
+      final userCredential = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      // Check if email exists in deliveryManagers collection
       final doc =
           await _firestore
               .collection('deliveryManagers')
-              .where('phone', isEqualTo: phoneNumber)
+              .where('email', isEqualTo: email)
               .get();
 
       if (doc.docs.isNotEmpty) {
@@ -34,16 +44,23 @@ class _LoginScreenState extends State<LoginScreen> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder:
-                (context) => DeliveryManagerInterface(phoneNumber: phoneNumber),
+            builder: (context) => DeliveryManagerInterface(phoneNumber: email),
           ),
         );
       } else {
+        // Not a delivery manager, log out and show error
+        await _auth.signOut();
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('사용자를 찾을수 없습니다')));
+        ).showSnackBar(SnackBar(content: Text('권한이 없습니다. 관리자에게 문의하세요.')));
       }
+    } on FirebaseAuthException catch (e) {
+      setState(() => _errorMessage = e.message);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Login failed: ${e.message}')));
     } catch (e) {
+      setState(() => _errorMessage = e.toString());
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Login failed: $e')));
@@ -67,14 +84,22 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               SizedBox(height: 32),
               TextField(
-                controller: _phoneController,
+                controller: _emailController,
                 decoration: InputDecoration(
-                  labelText: '전화번호',
+                  labelText: '이메일',
                   border: OutlineInputBorder(),
                 ),
-                keyboardType: TextInputType.phone,
+                keyboardType: TextInputType.emailAddress,
               ),
-
+              SizedBox(height: 16),
+              TextField(
+                controller: _passwordController,
+                decoration: InputDecoration(
+                  labelText: '비밀번호',
+                  border: OutlineInputBorder(),
+                ),
+                obscureText: true,
+              ),
               SizedBox(height: 24),
               if (_errorMessage != null)
                 Text(_errorMessage!, style: TextStyle(color: Colors.red)),
