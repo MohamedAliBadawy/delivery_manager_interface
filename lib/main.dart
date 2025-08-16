@@ -7,6 +7,7 @@ import 'package:delivery_manager_interface/models/user_model.dart';
 import 'package:excel/excel.dart' hide Border;
 import 'package:file_picker/file_picker.dart';
 import 'package:file_saver/file_saver.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -27,6 +28,8 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
     return ScreenUtilInit(
       designSize: const Size(1512, 982),
       child: MaterialApp(
@@ -35,7 +38,10 @@ class MyApp extends StatelessWidget {
           primarySwatch: Colors.blue,
           scaffoldBackgroundColor: Colors.white,
         ),
-        home: LoginScreen(),
+        home:
+            user != null
+                ? DeliveryManagerInterface(phoneNumber: user.email ?? '')
+                : LoginScreen(),
       ),
     );
   }
@@ -696,6 +702,24 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                     child: Text(
                       'Upload Courier id and Tracking numbers from excel',
                     ),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(0),
+                      ),
+                      minimumSize: Size(110.w, 40),
+                    ),
+                    onPressed: () async {
+                      await FirebaseAuth.instance.signOut();
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (context) => LoginScreen()),
+                        (route) => false,
+                      );
+                    },
+                    child: Text('Sign Out'),
                   ),
                 ],
               ),
