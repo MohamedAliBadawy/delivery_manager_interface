@@ -38,19 +38,14 @@ class MyApp extends StatelessWidget {
           primarySwatch: Colors.blue,
           scaffoldBackgroundColor: Colors.white,
         ),
-        home:
-            user != null
-                ? DeliveryManagerInterface(phoneNumber: user.email ?? '')
-                : LoginScreen(),
+        home: user != null ? DeliveryManagerInterface() : LoginScreen(),
       ),
     );
   }
 }
 
 class DeliveryManagerInterface extends StatefulWidget {
-  const DeliveryManagerInterface({super.key, required this.phoneNumber});
-
-  final String phoneNumber;
+  final String uid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
   @override
   State<DeliveryManagerInterface> createState() =>
@@ -107,7 +102,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
       future:
           FirebaseFirestore.instance
               .collection('deliveryManagers')
-              .where('phone', isEqualTo: widget.phoneNumber)
+              .where('userId', isEqualTo: widget.uid)
               .get(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -175,7 +170,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
       stream:
           FirebaseFirestore.instance
               .collection('products')
-              .where('deliveryManagerId', isEqualTo: widget.phoneNumber)
+              .where('deliveryManagerId', isEqualTo: widget.uid)
               .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -462,7 +457,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
     final querySnapshot =
         await FirebaseFirestore.instance
             .collection('orders')
-            .where('deliveryManagerId', isEqualTo: widget.phoneNumber)
+            .where('deliveryManagerId', isEqualTo: widget.uid)
             .where('confirmed', isEqualTo: true)
             .get();
 
@@ -770,10 +765,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                   stream:
                       FirebaseFirestore.instance
                           .collection('orders')
-                          .where(
-                            'deliveryManagerId',
-                            isEqualTo: widget.phoneNumber,
-                          )
+                          .where('deliveryManagerId', isEqualTo: widget.uid)
                           .snapshots(),
                   builder: (context, snapshot) {
                     if (snapshot.hasError) {

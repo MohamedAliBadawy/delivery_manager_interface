@@ -43,9 +43,7 @@ class _LoginScreenState extends State<LoginScreen> {
         // Successful login - navigate to home screen
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder: (context) => DeliveryManagerInterface(phoneNumber: email),
-          ),
+          MaterialPageRoute(builder: (context) => DeliveryManagerInterface()),
         );
       } else {
         // Not a delivery manager, log out and show error
