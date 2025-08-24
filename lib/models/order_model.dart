@@ -19,6 +19,7 @@ class MyOrder {
   String deliveryManager;
   String phoneNo;
   bool confirmed;
+  String carrierId;
   MyOrder({
     required this.orderId,
     required this.userId,
@@ -38,6 +39,7 @@ class MyOrder {
     required this.deliveryManager,
     required this.phoneNo,
     required this.confirmed,
+    required this.carrierId,
   });
 
   Map<String, Object?> toDocument() {
@@ -60,6 +62,7 @@ class MyOrder {
       'deliveryManager': deliveryManager,
       'phoneNo': phoneNo,
       'confirmed': confirmed,
+      'carrierId': carrierId,
     };
   }
 
@@ -83,6 +86,7 @@ class MyOrder {
       deliveryManager: doc['deliveryManager'] ?? '',
       phoneNo: doc['phoneNo'] ?? '',
       confirmed: doc['confirmed'] ?? false,
+      carrierId: doc['carrierId'] ?? '',
     );
   }
 

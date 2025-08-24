@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delivery_manager_interface/loading_dialog.dart';
 import 'package:delivery_manager_interface/models/order_model.dart';
 import 'package:delivery_manager_interface/models/product_model.dart';
 import 'package:delivery_manager_interface/models/user_model.dart';
@@ -515,7 +516,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
         TextCellValue(product?.supplyPrice?.toString() ?? ''),
         TextCellValue(product?.deliveryPrice?.toString() ?? ''),
         TextCellValue(product?.shippingFee?.toString() ?? ''),
-        TextCellValue(order.courier),
+        TextCellValue(order.carrierId),
         TextCellValue(order.trackingNumber),
       ]);
     }
@@ -610,12 +611,28 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
 
       if (response.statusCode == 200 && !responseData.containsKey('errors')) {
         print(responseData);
+
+        // ✅ Show success feedback
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('주문이 업데이트되었습니다'), // "Order confirmed"
+            backgroundColor: Colors.green,
+          ),
+        );
+
         return {'success': true};
       } else {
         final errorMessage =
             responseData['errors'] != null
                 ? responseData['errors'][0]['message']
                 : 'Failed to register tracking webhook';
+        // ❌ Show error feedback
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('오류 발생: $errorMessage'),
+            backgroundColor: Colors.red,
+          ),
+        );
         return {'success': false, 'error': errorMessage};
       }
     } catch (e) {
@@ -750,6 +767,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                             _buildTableHeader('택배사'),
                             _buildTableHeader('운송장 번호'),
                             _buildTableHeader(''),
+                            _buildTableHeader(''),
                           ],
                         ),
                       ],
@@ -826,7 +844,14 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
     );
   }
 
+  final Map<String, GlobalKey<FormState>> formKeys = {};
+
   Widget _buildOrderRow(MyOrder order) {
+    final formKey = formKeys.putIfAbsent(
+      order.orderId,
+      () => GlobalKey<FormState>(),
+    );
+
     return FutureBuilder(
       future: Future.wait([
         FirebaseFirestore.instance.collection('users').doc(order.userId).get(),
@@ -855,253 +880,329 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
           order.orderId,
           () => TextEditingController(),
         );
+        trackingNumberController.text =
+            order.trackingNumber ?? trackingNumberController.text;
         final courierIdController = courierControllers.putIfAbsent(
           order.orderId,
           () => TextEditingController(),
         );
-
-        return Table(
-          border: TableBorder.all(color: Colors.black),
-          columnWidths: _columnWidths,
-          children: [
-            TableRow(
-              children: [
-                // Order ID Column
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8.0,
-                    vertical: 8,
-                  ),
-                  child: Text(
-                    order.orderId,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                      color: Colors.black,
+        courierIdController.text = order.carrierId ?? courierIdController.text;
+        return Form(
+          key: formKey,
+          child: Table(
+            border: TableBorder.all(color: Colors.black),
+            columnWidths: _columnWidths,
+            children: [
+              TableRow(
+                children: [
+                  // Order ID Column
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8.0,
+                      vertical: 8,
                     ),
-                    textAlign: TextAlign.center,
+                    child: Text(
+                      order.orderId,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        color: Colors.black,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
-                ),
 
-                // Recipient Column
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8.0,
-                    vertical: 8,
+                  // Recipient Column
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8.0,
+                      vertical: 8,
+                    ),
+                    child: Text(
+                      user.name,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
-                  child: Text(
-                    user.name,
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                    textAlign: TextAlign.center,
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8.0,
+                      vertical: 8,
+                    ),
+                    child: Text(
+                      order.phoneNo,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8.0,
-                    vertical: 8,
-                  ),
-                  child: Text(
-                    order.phoneNo,
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                // Address Column
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8.0,
-                    vertical: 8,
-                  ),
-                  child: Text(
-                    order.deliveryAddress,
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                  ),
-                ),
-
-                // Delivery Instructions Column
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8.0,
-                    vertical: 8,
-                  ),
-                  child: Text(
-                    order.deliveryInstructions,
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                // Product Column
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0,
-                    vertical: 8,
-                  ),
-                  child: Text(
-                    product.productName,
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-
-                // Quantity Column
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8.0,
-                    vertical: 8,
-                  ),
-                  child: Text(
-                    order.quantity.toString(),
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8.0,
-                    vertical: 8,
-                  ),
-                  child: Text(
-                    "₩ ${product.price.toString()}",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8.0,
-                    vertical: 8,
-                  ),
-                  child: Text(
-                    "₩ ${product.deliveryPrice.toString()}",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8.0,
-                    vertical: 8,
-                  ),
-                  child: Text(
-                    "₩ ${product.shippingFee.toString()}",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                /*                 Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8.0,
-                    vertical: 8,
-                  ),
-                  child: Text(
-                    "₩ ${product.estimatedSettlement.toString()}",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                    textAlign: TextAlign.center,
-                  ),
-                ), */
-                // Courier Input Column
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8.0,
-                    vertical: 8,
-                  ),
-                  child: TextField(
-                    enabled: order.confirmed,
-
-                    controller: courierIdController,
-                    decoration: InputDecoration(
-                      labelText: '택배사',
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
+                  // Address Column
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8.0,
+                      vertical: 8,
+                    ),
+                    child: Text(
+                      order.deliveryAddress,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
                       ),
                     ),
                   ),
-                ),
 
-                // Tracking Number Input Column
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8.0,
-                    vertical: 8,
+                  // Delivery Instructions Column
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8.0,
+                      vertical: 8,
+                    ),
+                    child: Text(
+                      order.deliveryInstructions,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
-                  child: TextField(
-                    enabled: order.confirmed,
+                  // Product Column
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0,
+                      vertical: 8,
+                    ),
+                    child: Text(
+                      product.productName,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
 
-                    controller: trackingNumberController,
-                    decoration: InputDecoration(
-                      labelText: '운송장 번호',
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
+                  // Quantity Column
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8.0,
+                      vertical: 8,
+                    ),
+                    child: Text(
+                      order.quantity.toString(),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8.0,
+                      vertical: 8,
+                    ),
+                    child: Text(
+                      "₩ ${product.price.toString()}",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8.0,
+                      vertical: 8,
+                    ),
+                    child: Text(
+                      "₩ ${product.deliveryPrice.toString()}",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8.0,
+                      vertical: 8,
+                    ),
+                    child: Text(
+                      "₩ ${product.shippingFee.toString()}",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  /*                 Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8.0,
+                      vertical: 8,
+                    ),
+                    child: Text(
+                      "₩ ${product.estimatedSettlement.toString()}",
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                      textAlign: TextAlign.center,
+                    ),
+                  ), */
+                  // Courier Input Column
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8.0,
+                      vertical: 8,
+                    ),
+                    child: TextFormField(
+                      enabled: order.confirmed,
+                      controller: courierIdController,
+                      decoration: InputDecoration(
+                        labelText: '택배사',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                       ),
                     ),
                   ),
-                ),
 
-                // Submit Button Column
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 5.0,
-                    vertical: 8,
+                  // Tracking Number Input Column
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8.0,
+                      vertical: 8,
+                    ),
+                    child: TextFormField(
+                      enabled: order.confirmed,
+                      controller: trackingNumberController,
+                      decoration: InputDecoration(
+                        labelText: '운송장 번호',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return '운송장 번호를 입력하세요'; // "Please enter tracking number"
+                        }
+                        // Example: validate format yyyy-MM-ddTHH:00:00Z
+                        final regex = RegExp(
+                          r'^\d{4}-\d{2}-\d{2}T\d{2}:00:00Z$',
+                        );
+                        if (!regex.hasMatch(value)) {
+                          return '올바른 형식이 아닙니다 (yyyy-MM-ddTHH:00:00Z)';
+                        }
+                        return null;
+                      },
+                    ),
                   ),
-                  child: ElevatedButton(
-                    onPressed:
-                        order.confirmed
-                            ? () async {
-                              print(
+
+                  // Submit Button Column
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5.0,
+                      vertical: 8,
+                    ),
+                    child: ElevatedButton(
+                      onPressed:
+                          order.confirmed
+                              ? () async {
+                                if (!formKey.currentState!.validate()) return;
+                                formKey.currentState!.save();
+                                showLoadingDialog(context);
+
                                 await registerTrackingManually(
                                   courierIdController.text,
                                   trackingNumberController.text,
                                   order,
-                                ),
-                              );
-                            }
-                            : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(0),
+                                );
+
+                                Navigator.pop(context);
+                              }
+                              : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(0),
+                        ),
+                        minimumSize: Size(110.w, 40),
                       ),
-                      minimumSize: Size(110.w, 40),
+                      child: Text('제출', style: TextStyle(color: Colors.white)),
                     ),
-                    child: Text('제출', style: TextStyle(color: Colors.white)),
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 5.0,
-                    vertical: 8,
-                  ),
-                  child: ElevatedButton(
-                    onPressed:
-                        order.confirmed
-                            ? null
-                            : () async {
-                              await FirebaseFirestore.instance
-                                  .collection('orders')
-                                  .doc(order.orderId)
-                                  .update({'confirmed': true});
-                            },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(0),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5.0,
+                      vertical: 8,
+                    ),
+                    child: ElevatedButton(
+                      onPressed:
+                          order.confirmed
+                              ? null
+                              : () async {
+                                showLoadingDialog(context);
+                                try {
+                                  await FirebaseFirestore.instance
+                                      .collection('orders')
+                                      .doc(order.orderId)
+                                      .update({'confirmed': true});
+
+                                  Navigator.pop(
+                                    context,
+                                  ); // close loading dialog
+
+                                  //  Show success feedback
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        '주문이 확인되었습니다',
+                                      ), // "Order confirmed"
+                                      backgroundColor: Colors.green,
+                                    ),
+                                  );
+                                } catch (e) {
+                                  Navigator.pop(
+                                    context,
+                                  ); // close loading dialog
+
+                                  //  Show error feedback
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('오류 발생: $e'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
+                              },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(0),
+                        ),
+                      ),
+                      child: Text(
+                        order.confirmed ? 'Confirmed' : 'Confirm',
+                        style: TextStyle(color: Colors.white),
                       ),
                     ),
-                    child: Text(
-                      order.confirmed ? 'Confirmed' : 'Confirm',
-                      style: TextStyle(color: Colors.white),
-                    ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         );
       },
     );
