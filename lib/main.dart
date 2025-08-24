@@ -1062,7 +1062,10 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                       vertical: 8,
                     ),
                     child: TextFormField(
-                      enabled: order.confirmed,
+                      enabled:
+                          (order.carrierId == '' &&
+                              order.trackingNumber == '') &&
+                          order.confirmed,
                       controller: courierIdController,
                       decoration: InputDecoration(
                         labelText: '택배사',
@@ -1082,7 +1085,10 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                       vertical: 8,
                     ),
                     child: TextFormField(
-                      enabled: order.confirmed,
+                      enabled:
+                          (order.carrierId == '' &&
+                              order.trackingNumber == '') &&
+                          order.confirmed,
                       controller: trackingNumberController,
                       decoration: InputDecoration(
                         labelText: '운송장 번호',
@@ -1116,7 +1122,9 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                     ),
                     child: ElevatedButton(
                       onPressed:
-                          order.confirmed
+                          order.confirmed &&
+                                  (order.carrierId == '' &&
+                                      order.trackingNumber == '')
                               ? () async {
                                 if (!formKey.currentState!.validate()) return;
                                 formKey.currentState!.save();
@@ -1132,8 +1140,18 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                               }
                               : null,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.black,
-                        foregroundColor: Colors.white,
+                        backgroundColor:
+                            order.confirmed &&
+                                    (order.carrierId == '' &&
+                                        order.trackingNumber == '')
+                                ? Colors.black
+                                : Colors.white,
+                        foregroundColor:
+                            order.confirmed &&
+                                    (order.carrierId == '' &&
+                                        order.trackingNumber == '')
+                                ? Colors.white
+                                : Colors.black,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(0),
                         ),
