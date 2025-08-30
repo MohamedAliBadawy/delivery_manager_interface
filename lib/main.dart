@@ -115,7 +115,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
             snapshot.data!.docs.isEmpty) {
           return Padding(
             padding: EdgeInsets.all(16.0),
-            child: Text('Manager information not found'),
+            child: Text('관리자 정보를 찾을 수 없습니다'),
           );
         }
 
@@ -123,7 +123,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
         return Column(
           children: [
             Text(
-              'Manage Information',
+              '관리자 정보',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             Padding(
@@ -135,25 +135,25 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                 children: [
                   TableRow(
                     children: [
-                      Center(child: Text('Name')),
+                      Center(child: Text('이름')),
                       Center(child: Text(manager['name'] ?? 'N/A')),
                     ],
                   ),
                   TableRow(
                     children: [
-                      Center(child: Text('Phone number')),
+                      Center(child: Text('전화번호')),
                       Center(child: Text(manager['phone'] ?? 'N/A')),
                     ],
                   ),
                   TableRow(
                     children: [
-                      Center(child: Text('Email')),
+                      Center(child: Text('이메일')),
                       Center(child: Text(manager['email'] ?? 'N/A')),
                     ],
                   ),
                   TableRow(
                     children: [
-                      Center(child: Text('Banking information')),
+                      Center(child: Text('은행 정보')),
                       Center(child: Text(manager['bankInfo'] ?? 'N/A')),
                     ],
                   ),
@@ -183,7 +183,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
             snapshot.data!.docs.isEmpty) {
           return Padding(
             padding: EdgeInsets.all(16.0),
-            child: Text('No products found'),
+            child: Text('제품이 없습니다'),
           );
         }
 
@@ -210,7 +210,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               const Text(
-                                'Contract Information',
+                                '계약 정보',
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
@@ -225,7 +225,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                                 children: [
                                   TableRow(
                                     children: [
-                                      const Center(child: Text('Product Name')),
+                                      const Center(child: Text('제품명')),
                                       Center(
                                         child: Text(
                                           product['productName'] ?? 'N/A',
@@ -235,7 +235,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                                   ),
                                   TableRow(
                                     children: [
-                                      const Center(child: Text('Supply price')),
+                                      const Center(child: Text('공급가')),
                                       Center(
                                         child: Text(
                                           '₩${product['price']?.toString() ?? 'N/A'}',
@@ -245,9 +245,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                                   ),
                                   TableRow(
                                     children: [
-                                      const Center(
-                                        child: Text('Delivery price'),
-                                      ),
+                                      const Center(child: Text('배송비')),
                                       Center(
                                         child: Text(
                                           '₩ ${product['deliveryPrice']?.toString() ?? 'N/A'}',
@@ -257,11 +255,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                                   ),
                                   TableRow(
                                     children: [
-                                      const Center(
-                                        child: Text(
-                                          'Additional shipping fee for remote',
-                                        ),
-                                      ),
+                                      const Center(child: Text('도서산간 추가 배송비')),
                                       Center(
                                         child: Text(
                                           '₩ ${product['shippingFee']?.toString() ?? 'N/A'}',
@@ -284,7 +278,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               const Text(
-                                'Order cut-off time/ Stock Management',
+                                '주문 마감 시간/재고 관리',
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
@@ -298,9 +292,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                                 children: [
                                   TableRow(
                                     children: [
-                                      const Center(
-                                        child: Text('Order cut-off time'),
-                                      ),
+                                      const Center(child: Text('주문 마감 시간')),
                                       Center(
                                         child: Text(
                                           '${product['baselineTime']?.toString() ?? 'N/A'} ${product['meridiem'] ?? 'N/A'}',
@@ -333,9 +325,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                                   ),
                                   TableRow(
                                     children: [
-                                      const Center(
-                                        child: Text('Current stock'),
-                                      ),
+                                      const Center(child: Text('현재 재고')),
                                       Center(
                                         child: Text(
                                           product['stock']?.toString() ?? 'N/A',
@@ -469,14 +459,14 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
     sheet.appendRow([
       TextCellValue('주문 ID'),
       TextCellValue('수취인'),
-      TextCellValue('Phone'),
+      TextCellValue('전화번호'),
       TextCellValue('주소'),
       TextCellValue('배송 요청사항'),
       TextCellValue('제품'),
       TextCellValue('수량'),
-      TextCellValue('Supply price'),
-      TextCellValue('Delivery price'),
-      TextCellValue('Shipping fee'),
+      TextCellValue('공급가'),
+      TextCellValue('배송비'),
+      TextCellValue('도서산간 추가 배송비'),
       TextCellValue('택배사'),
       TextCellValue('운송장 번호'),
     ]);
@@ -566,9 +556,9 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
       }
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Tracking numbers loaded into fields!')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('운송장 번호가 필드에 로드되었습니다')));
   }
 
   Future<Map<String, dynamic>> registerTrackingManually(
@@ -699,7 +689,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                       minimumSize: Size(110.w, 40),
                     ),
                     onPressed: _downloadOrdersAsExcel,
-                    child: Text('Download Orders as Excel'),
+                    child: Text('주문 엑셀 다운로드'),
                   ),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
@@ -711,9 +701,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                       minimumSize: Size(110.w, 40),
                     ),
                     onPressed: _uploadTrackingExcel,
-                    child: Text(
-                      'Upload Courier id and Tracking numbers from excel',
-                    ),
+                    child: Text('엑셀에서 택배사 및 운송장 번호 업로드'),
                   ),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
@@ -731,7 +719,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                         (route) => false,
                       );
                     },
-                    child: Text('Sign Out'),
+                    child: Text('로그아웃'),
                   ),
                 ],
               ),
@@ -755,14 +743,14 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                           children: [
                             _buildTableHeader('주문 ID'),
                             _buildTableHeader('수취인'),
-                            _buildTableHeader('Phone'),
+                            _buildTableHeader('전화번호'),
                             _buildTableHeader('주소'),
                             _buildTableHeader('배송 요청사항'),
                             _buildTableHeader('제품'),
                             _buildTableHeader('수량'),
-                            _buildTableHeader('Supply price'),
-                            _buildTableHeader('Delivery price'),
-                            _buildTableHeader('Shipping fee'),
+                            _buildTableHeader('공급가'),
+                            _buildTableHeader('배송비'),
+                            _buildTableHeader('도서산간 추가 배송비'),
                             /*  _buildTableHeader('Estimated settlement'), */
                             _buildTableHeader('택배사'),
                             _buildTableHeader('운송장 번호'),
@@ -1212,7 +1200,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                         ),
                       ),
                       child: Text(
-                        order.confirmed ? 'Confirmed' : 'Confirm',
+                        order.confirmed ? '확인됨' : '확인',
                         style: TextStyle(color: Colors.white),
                       ),
                     ),
@@ -1266,7 +1254,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
           const Text(': '),
           Expanded(child: Text(value)),
           IconButton(
-            icon: const Text('Change', style: TextStyle(color: Colors.blue)),
+            icon: const Text('변경', style: TextStyle(color: Colors.blue)),
             onPressed: onPressed,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
@@ -1289,7 +1277,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: Text('Edit Product'),
+              title: Text('제품 수정'),
               content: Container(
                 width: 600,
                 child: Form(
@@ -1371,7 +1359,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                                 children: [
                                   CircularProgressIndicator(),
                                   SizedBox(width: 16),
-                                  Text("Updating cutoff time..."),
+                                  Text("기준 시간 업데이트 중..."),
                                 ],
                               ),
                             ),
@@ -1392,7 +1380,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                       // Verify document exists
                       final doc = await productRef.get();
                       if (!doc.exists) {
-                        throw Exception('Product document not found');
+                        throw Exception('제품 문서를 찾을 수 없습니다');
                       }
 
                       // Debug output
@@ -1423,7 +1411,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                       // Show success message
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('Cutoff time updated successfully'),
+                          content: Text('기준 시간이 성공적으로 업데이트됨'),
                           duration: Duration(seconds: 2),
                         ),
                       );
@@ -1438,9 +1426,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                       // Show detailed error message
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text(
-                            'Failed to update cutoff time: ${e.toString()}',
-                          ),
+                          content: Text('기준 시간 업데이트 실패: ${e.toString()}'),
                           backgroundColor: Colors.red,
                           duration: Duration(seconds: 5),
                         ),
@@ -1469,7 +1455,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: Text('Edit Product'),
+              title: Text('제품 수정'),
               content: Container(
                 width: 600,
                 child: Form(
@@ -1528,7 +1514,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                                 children: [
                                   CircularProgressIndicator(),
                                   SizedBox(width: 16),
-                                  Text("Updating stock..."),
+                                  Text("재고 업데이트 중..."),
                                 ],
                               ),
                             ),
@@ -1563,7 +1549,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                       // Show success message
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('Stock updated successfully'),
+                          content: Text('재고가 성공적으로 업데이트됨'),
                           duration: Duration(seconds: 2),
                         ),
                       );
@@ -1577,9 +1563,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
 
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text(
-                            'Failed to update stock: ${e.toString()}',
-                          ),
+                          content: Text('재고 업데이트 실패: ${e.toString()}'),
                           backgroundColor: Colors.red,
                           duration: Duration(seconds: 5),
                         ),
