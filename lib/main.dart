@@ -1090,13 +1090,6 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                         if (value == null || value.isEmpty) {
                           return '운송장 번호를 입력하세요'; // "Please enter tracking number"
                         }
-                        // Example: validate format yyyy-MM-ddTHH:00:00Z
-                        final regex = RegExp(
-                          r'^\d{4}-\d{2}-\d{2}T\d{2}:00:00Z$',
-                        );
-                        if (!regex.hasMatch(value)) {
-                          return '올바른 형식이 아닙니다 (yyyy-MM-ddTHH:00:00Z)';
-                        }
                         return null;
                       },
                     ),
