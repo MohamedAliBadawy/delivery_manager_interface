@@ -461,9 +461,12 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
       TextCellValue('수취인'),
       TextCellValue('전화번호'),
       TextCellValue('주소'),
+      TextCellValue('상세주소'),
       TextCellValue('배송 요청사항'),
       TextCellValue('제품'),
       TextCellValue('수량'),
+      TextCellValue('날짜'),
+      TextCellValue('가격'),
       TextCellValue('공급가'),
       TextCellValue('배송비'),
       TextCellValue('도서산간 추가 배송비'),
@@ -500,9 +503,14 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
         TextCellValue(user?.name ?? ''),
         TextCellValue(order.phoneNo),
         TextCellValue(order.deliveryAddress),
+        TextCellValue(order.deliveryAddressDetail),
         TextCellValue(order.deliveryInstructions),
         TextCellValue(product?.productName ?? ''),
         TextCellValue(order.quantity.toString()),
+        TextCellValue(
+          DateTime.parse(order.orderDate).toLocal().toString().split('.')[0],
+        ),
+        TextCellValue(order.totalPrice.toString()),
         TextCellValue(product?.supplyPrice?.toString() ?? ''),
         TextCellValue(product?.deliveryPrice?.toString() ?? ''),
         TextCellValue(product?.shippingFee?.toString() ?? ''),
@@ -535,8 +543,8 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
     final sheet = excel['Sheet1'];
     for (var row in sheet.rows.skip(1)) {
       final orderId = row[0]?.value?.toString();
-      final trackingNumber = row[11]?.value?.toString();
-      final courierId = row[10]?.value?.toString();
+      final trackingNumber = row[14]?.value?.toString();
+      final courierId = row[13]?.value?.toString();
 
       if (orderId != null) {
         // Check if order is confirmed before updating controllers
@@ -745,9 +753,12 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                             _buildTableHeader('수취인'),
                             _buildTableHeader('전화번호'),
                             _buildTableHeader('주소'),
+                            _buildTableHeader('상세주소'),
                             _buildTableHeader('배송 요청사항'),
                             _buildTableHeader('제품'),
                             _buildTableHeader('수량'),
+                            _buildTableHeader('가격'),
+                            _buildTableHeader('날짜'),
                             _buildTableHeader('공급가'),
                             _buildTableHeader('배송비'),
                             _buildTableHeader('도서산간 추가 배송비'),
@@ -943,7 +954,19 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                       ),
                     ),
                   ),
-
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8.0,
+                      vertical: 8,
+                    ),
+                    child: Text(
+                      order.deliveryAddressDetail,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
                   // Delivery Instructions Column
                   Padding(
                     padding: const EdgeInsets.symmetric(
@@ -983,6 +1006,36 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                     ),
                     child: Text(
                       order.quantity.toString(),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8.0,
+                      vertical: 8,
+                    ),
+                    child: Text(
+                      order.totalPrice.toString(),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8.0,
+                      vertical: 8,
+                    ),
+                    child: Text(
+                      DateTime.parse(
+                        order.orderDate,
+                      ).toLocal().toString().split('.')[0],
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
