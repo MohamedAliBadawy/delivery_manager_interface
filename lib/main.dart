@@ -1,10 +1,13 @@
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delivery_manager_interface/core/constants.dart';
 import 'package:delivery_manager_interface/loading_dialog.dart';
 import 'package:delivery_manager_interface/models/order_model.dart';
 import 'package:delivery_manager_interface/models/product_model.dart';
 import 'package:delivery_manager_interface/models/user_model.dart';
+import 'package:delivery_manager_interface/widgets/manager_info.dart';
+import 'package:delivery_manager_interface/widgets/orders_table_header.dart';
 import 'package:excel/excel.dart' hide Border;
 import 'package:file_picker/file_picker.dart';
 import 'package:file_saver/file_saver.dart';
@@ -62,13 +65,18 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
   final ValueNotifier<int> _currentIndexNotifier = ValueNotifier<int>(0);
   final Map<String, TextEditingController> trackingControllers = {};
   final Map<String, TextEditingController> courierControllers = {};
-
+  int _currentTabIndex = 0;
+  final List<Map<String, String>> _orderStages = [
+    {'label': '배송 준비중', 'status': 'Preparing for Shipment'},
+    {'label': '배송중', 'status': 'In Transit'},
+    {'label': '배송 완료', 'status': 'Completed'},
+    {'label': '교환/반품 요청', 'status': 'exchange'}, // special case
+  ];
   @override
   void initState() {
     super.initState();
     _headerScrollController = ScrollController();
     _bodyScrollController = ScrollController();
-
     _headerScrollController.addListener(() {
       if (_bodyScrollController.hasClients &&
           _bodyScrollController.offset != _headerScrollController.offset) {
@@ -96,74 +104,6 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
     _headerScrollController.dispose();
     _bodyScrollController.dispose();
     super.dispose();
-  }
-
-  Widget _buildManagerInfo() {
-    return FutureBuilder(
-      future:
-          FirebaseFirestore.instance
-              .collection('deliveryManagers')
-              .where('userId', isEqualTo: widget.uid)
-              .get(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (snapshot.hasError ||
-            !snapshot.hasData ||
-            snapshot.data!.docs.isEmpty) {
-          return Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text('관리자 정보를 찾을 수 없습니다'),
-          );
-        }
-
-        final manager = snapshot.data!.docs.first.data();
-        return Column(
-          children: [
-            Text(
-              '관리자 정보',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Table(
-                defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-
-                border: TableBorder.all(width: 2.0, color: Colors.black),
-                children: [
-                  TableRow(
-                    children: [
-                      Center(child: Text('이름')),
-                      Center(child: Text(manager['name'] ?? 'N/A')),
-                    ],
-                  ),
-                  TableRow(
-                    children: [
-                      Center(child: Text('전화번호')),
-                      Center(child: Text(manager['phone'] ?? 'N/A')),
-                    ],
-                  ),
-                  TableRow(
-                    children: [
-                      Center(child: Text('이메일')),
-                      Center(child: Text(manager['email'] ?? 'N/A')),
-                    ],
-                  ),
-                  TableRow(
-                    children: [
-                      Center(child: Text('은행 정보')),
-                      Center(child: Text(manager['bankInfo'] ?? 'N/A')),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   Widget _buildProductsInfo() {
@@ -638,23 +578,6 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
     }
   }
 
-  final Map<int, TableColumnWidth> _columnWidths = {
-    0: FlexColumnWidth(1), // Order ID
-    1: FlexColumnWidth(1), // Recipient
-    2: FlexColumnWidth(1), // Phone
-    3: FlexColumnWidth(1), // Address
-    4: FlexColumnWidth(1), // Delivery Note
-    5: FlexColumnWidth(1), // Product
-    6: FlexColumnWidth(1), // Quantity
-    7: FlexColumnWidth(1), // Supply price
-    8: FlexColumnWidth(1), // Delivery price
-    9: FlexColumnWidth(1), // Shipping fee
-    /*     10: FlexColumnWidth(1), // Estimated settlement
- */
-    10: FlexColumnWidth(1), // Courier
-    11: FlexColumnWidth(1), // Tracking Number
-    12: FlexColumnWidth(1.5), // Submit Button (wider)
-  };
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -670,7 +593,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                         ? Column(
                           children: [
                             // Manager Information
-                            _buildManagerInfo(),
+                            buildManagerInfo(widget.uid),
                             SizedBox(height: 20),
                             // Products Information
                             _buildProductsInfo(),
@@ -678,7 +601,10 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                         )
                         : Row(
                           children: [
-                            Flexible(flex: 1, child: _buildManagerInfo()),
+                            Flexible(
+                              flex: 1,
+                              child: buildManagerInfo(widget.uid),
+                            ),
                             Flexible(flex: 3, child: _buildProductsInfo()),
                           ],
                         ),
@@ -731,91 +657,94 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                   ),
                 ],
               ),
-              SizedBox(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  controller: _headerScrollController,
-                  child: Container(
-                    width: 1600,
+              SizedBox(height: 24.h),
+              // Tabs for order stages
+              StatefulBuilder(
+                builder: (context, setLocalState) {
+                  return Column(
+                    children: [
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
 
-                    decoration: BoxDecoration(
-                      border: Border(
-                        bottom: BorderSide(color: Colors.grey.shade300),
-                      ),
-                    ),
-                    child: Table(
-                      border: TableBorder.all(color: Colors.black),
-                      columnWidths: _columnWidths,
-                      children: [
-                        TableRow(
-                          children: [
-                            _buildTableHeader('주문 ID'),
-                            _buildTableHeader('수취인'),
-                            _buildTableHeader('전화번호'),
-                            _buildTableHeader('주소'),
-                            _buildTableHeader('상세주소'),
-                            _buildTableHeader('배송 요청사항'),
-                            _buildTableHeader('제품'),
-                            _buildTableHeader('수량'),
-                            _buildTableHeader('가격'),
-                            _buildTableHeader('날짜'),
-                            _buildTableHeader('공급가'),
-                            _buildTableHeader('배송비'),
-                            _buildTableHeader('도서산간 추가 배송비'),
-                            /*  _buildTableHeader('Estimated settlement'), */
-                            _buildTableHeader('택배사'),
-                            _buildTableHeader('운송장 번호'),
-                            _buildTableHeader(''),
-                            _buildTableHeader(''),
-                          ],
+                        child: SizedBox(
+                          width: 1600,
+
+                          child: DefaultTabController(
+                            length: 5,
+                            child: TabBar(
+                              labelColor: Colors.black,
+                              unselectedLabelColor: Colors.grey,
+                              indicatorColor: Colors.transparent,
+                              tabs: const [
+                                Tab(text: '신규주문'),
+                                Tab(text: '배송준비중'),
+                                Tab(text: '배송중'),
+                                Tab(text: '배송완료'),
+                                Tab(text: '교환 반품요청'),
+                              ],
+                              onTap: (index) {
+                                setLocalState(() {
+                                  _currentTabIndex = index;
+                                });
+                              },
+                            ),
+                          ),
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+                      ),
+                      ordersTableHeader(_headerScrollController),
+                      SizedBox(
+                        height: 400, // adjust as needed for table body
 
-              SizedBox(
-                height: 400, // adjust as needed for table body
+                        child: StreamBuilder<QuerySnapshot>(
+                          stream:
+                              FirebaseFirestore.instance
+                                  .collection('orders')
+                                  .where(
+                                    'deliveryManagerId',
+                                    isEqualTo: widget.uid,
+                                  )
+                                  .snapshots(),
+                          builder: (context, snapshot) {
+                            if (snapshot.hasError) {
+                              return Center(
+                                child: Text('Error: ${snapshot.error}'),
+                              );
+                            }
+                            // 3. Check for null data
+                            if (!snapshot.hasData || snapshot.data == null) {
+                              return Center(child: Text('주문이 없습니다'));
+                            }
+                            final orders = snapshot.data!.docs;
 
-                child: StreamBuilder<QuerySnapshot>(
-                  stream:
-                      FirebaseFirestore.instance
-                          .collection('orders')
-                          .where('deliveryManagerId', isEqualTo: widget.uid)
-                          .snapshots(),
-                  builder: (context, snapshot) {
-                    if (snapshot.hasError) {
-                      return Center(child: Text('Error: ${snapshot.error}'));
-                    }
-                    // 3. Check for null data
-                    if (!snapshot.hasData || snapshot.data == null) {
-                      return Center(child: Text('주문이 없습니다'));
-                    }
-                    final orders = snapshot.data!.docs;
+                            if (orders.isEmpty) {
+                              return Center(child: Text('주문이 없습니다'));
+                            }
+                            return _buildOrderTableForStatus(
+                              _currentTabIndex,
+                            ); /* SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              controller: _bodyScrollController,
+                              child: SizedBox(
+                                width: 1600,
 
-                    if (orders.isEmpty) {
-                      return Center(child: Text('주문이 없습니다'));
-                    }
-                    return SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      controller: _bodyScrollController,
-                      child: SizedBox(
-                        width: 1600,
-
-                        child: ListView.builder(
-                          itemCount: orders.length,
-                          itemBuilder: (context, index) {
-                            final order = MyOrder.fromDocument(
-                              orders[index].data() as Map<String, dynamic>,
-                            );
-                            return _buildOrderRow(order);
+                                child: ListView.builder(
+                                  itemCount: orders.length,
+                                  itemBuilder: (context, index) {
+                                    final order = MyOrder.fromDocument(
+                                      orders[index].data()
+                                          as Map<String, dynamic>,
+                                    );
+                                    return _buildOrderRow(order);
+                                  },
+                                ),
+                              ),
+                            ); */
                           },
                         ),
                       ),
-                    );
-                  },
-                ),
+                    ],
+                  );
+                },
               ),
             ],
           ),
@@ -824,22 +753,88 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
     );
   }
 
+  Widget _buildOrderTableForStatus(int status) {
+    late Stream<QuerySnapshot> stream;
+    switch (status) {
+      case 0:
+        stream =
+            FirebaseFirestore.instance
+                .collection('orders')
+                .where('deliveryManagerId', isEqualTo: widget.uid)
+                .where('orderStatus', isEqualTo: 'orderComplete')
+                .where('confirmed', isEqualTo: false)
+                .snapshots();
+        break;
+      case 1:
+        stream =
+            FirebaseFirestore.instance
+                .collection('orders')
+                .where('deliveryManagerId', isEqualTo: widget.uid)
+                .where('orderStatus', isEqualTo: 'orderComplete')
+                .where('confirmed', isEqualTo: true)
+                .snapshots();
+        break;
+      case 2:
+        stream =
+            FirebaseFirestore.instance
+                .collection('orders')
+                .where('deliveryManagerId', isEqualTo: widget.uid)
+                .where('orderStatus', isEqualTo: 'IN_TRANSIT')
+                .snapshots();
+        break;
+      case 3:
+        stream =
+            FirebaseFirestore.instance
+                .collection('orders')
+                .where('deliveryManagerId', isEqualTo: widget.uid)
+                .where('orderStatus', isEqualTo: 'DELIVERED')
+                .snapshots();
+      case 4:
+        stream =
+            FirebaseFirestore.instance
+                .collection('orders')
+                .where('deliveryManagerId', isEqualTo: widget.uid)
+                .where('orderStatus', isEqualTo: status)
+                .snapshots();
+    }
+    return StreamBuilder<QuerySnapshot>(
+      stream: stream,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Text('Error: ${snapshot.error}');
+        }
+        if (!snapshot.hasData || snapshot.data == null) {
+          return Text('주문이 없습니다');
+        }
+        final orders = snapshot.data!.docs;
+        if (orders.isEmpty) {
+          return Text('주문이 없습니다');
+        }
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          controller: _bodyScrollController,
+          child: SizedBox(
+            width: 1600,
+            child: ListView.builder(
+              itemCount: orders.length,
+              itemBuilder: (context, index) {
+                final order = MyOrder.fromDocument(
+                  orders[index].data() as Map<String, dynamic>,
+                );
+                return _buildOrderRow(order);
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   void _scrollTo(int index) {
     itemScrollController.scrollTo(
       index: index,
       duration: Duration(milliseconds: 300),
       curve: Curves.easeInOut,
-    );
-  }
-
-  Widget _buildTableHeader(String text) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 4.0),
-      child: Text(
-        text,
-        style: TextStyle(fontWeight: FontWeight.bold),
-        textAlign: TextAlign.center,
-      ),
     );
   }
 
@@ -890,7 +885,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
           key: formKey,
           child: Table(
             border: TableBorder.all(color: Colors.black),
-            columnWidths: _columnWidths,
+            columnWidths: columnWidths,
             children: [
               TableRow(
                 children: [
@@ -1019,7 +1014,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                       vertical: 8,
                     ),
                     child: Text(
-                      order.totalPrice.toString(),
+                      "₩ ${order.totalPrice.toString()}",
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
@@ -1260,7 +1255,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
+  /*   Widget _buildInfoRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
@@ -1279,8 +1274,8 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
       ),
     );
   }
-
-  Widget _buildEditableInfoRow(
+ */
+  /*   Widget _buildEditableInfoRow(
     String label,
     String value, {
     required VoidCallback onPressed,
@@ -1308,7 +1303,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
         ],
       ),
     );
-  }
+  } */
 
   void _editCutoffTime(Map<String, dynamic> product) {
     final _formKey = GlobalKey<FormState>();
