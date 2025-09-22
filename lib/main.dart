@@ -610,52 +610,61 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                         ),
               ),
               SizedBox(height: 24.h),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(0),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+
+                child: SizedBox(
+                  width: 600,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.black,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(0),
+                          ),
+                          minimumSize: Size(110.w, 40),
+                        ),
+                        onPressed: _downloadOrdersAsExcel,
+                        child: Text('주문 엑셀 다운로드'),
                       ),
-                      minimumSize: Size(110.w, 40),
-                    ),
-                    onPressed: _downloadOrdersAsExcel,
-                    child: Text('주문 엑셀 다운로드'),
-                  ),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(0),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.black,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(0),
+                          ),
+                          minimumSize: Size(110.w, 40),
+                        ),
+                        onPressed: _uploadTrackingExcel,
+                        child: Text('엑셀에서 택배사 및 운송장 번호 업로드'),
                       ),
-                      minimumSize: Size(110.w, 40),
-                    ),
-                    onPressed: _uploadTrackingExcel,
-                    child: Text('엑셀에서 택배사 및 운송장 번호 업로드'),
-                  ),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(0),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(0),
+                          ),
+                          minimumSize: Size(110.w, 40),
+                        ),
+                        onPressed: () async {
+                          await FirebaseAuth.instance.signOut();
+                          Navigator.of(context).pushAndRemoveUntil(
+                            MaterialPageRoute(
+                              builder: (context) => LoginScreen(),
+                            ),
+                            (route) => false,
+                          );
+                        },
+                        child: Text('로그아웃'),
                       ),
-                      minimumSize: Size(110.w, 40),
-                    ),
-                    onPressed: () async {
-                      await FirebaseAuth.instance.signOut();
-                      Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute(builder: (context) => LoginScreen()),
-                        (route) => false,
-                      );
-                    },
-                    child: Text('로그아웃'),
+                    ],
                   ),
-                ],
+                ),
               ),
               SizedBox(height: 24.h),
               // Tabs for order stages
