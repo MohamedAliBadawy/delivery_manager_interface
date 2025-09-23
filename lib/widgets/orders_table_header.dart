@@ -19,6 +19,7 @@ Widget ordersTableHeader(ScrollController headerScrollController) {
           children: [
             TableRow(
               children: [
+                buildTableHeader('날짜'),
                 buildTableHeader('주문 ID'),
                 buildTableHeader('수취인'),
                 buildTableHeader('전화번호'),
@@ -28,7 +29,6 @@ Widget ordersTableHeader(ScrollController headerScrollController) {
                 buildTableHeader('제품'),
                 buildTableHeader('수량'),
                 buildTableHeader('가격'),
-                buildTableHeader('날짜'),
                 buildTableHeader('공급가'),
                 buildTableHeader('배송비'),
                 buildTableHeader('도서산간 추가 배송비'),

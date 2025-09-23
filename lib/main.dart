@@ -397,6 +397,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
 
     // Header row
     sheet.appendRow([
+      TextCellValue('날짜'),
       TextCellValue('주문 ID'),
       TextCellValue('수취인'),
       TextCellValue('전화번호'),
@@ -405,7 +406,6 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
       TextCellValue('배송 요청사항'),
       TextCellValue('제품'),
       TextCellValue('수량'),
-      TextCellValue('날짜'),
       TextCellValue('가격'),
       TextCellValue('공급가'),
       TextCellValue('배송비'),
@@ -439,6 +439,9 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
               : null;
 
       sheet.appendRow([
+        TextCellValue(
+          DateTime.parse(order.orderDate).toLocal().toString().split('.')[0],
+        ),
         TextCellValue(order.orderId),
         TextCellValue(user?.name ?? ''),
         TextCellValue(order.phoneNo),
@@ -447,9 +450,6 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
         TextCellValue(order.deliveryInstructions),
         TextCellValue(product?.productName ?? ''),
         TextCellValue(order.quantity.toString()),
-        TextCellValue(
-          DateTime.parse(order.orderDate).toLocal().toString().split('.')[0],
-        ),
         TextCellValue(order.totalPrice.toString()),
         TextCellValue(product?.supplyPrice?.toString() ?? ''),
         TextCellValue(product?.deliveryPrice?.toString() ?? ''),
@@ -898,6 +898,22 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
             children: [
               TableRow(
                 children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8.0,
+                      vertical: 8,
+                    ),
+                    child: Text(
+                      DateTime.parse(
+                        order.orderDate,
+                      ).toLocal().toString().split('.')[0],
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                   // Order ID Column
                   Padding(
                     padding: const EdgeInsets.symmetric(
@@ -1031,22 +1047,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                       textAlign: TextAlign.center,
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8.0,
-                      vertical: 8,
-                    ),
-                    child: Text(
-                      DateTime.parse(
-                        order.orderDate,
-                      ).toLocal().toString().split('.')[0],
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
+
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8.0,
