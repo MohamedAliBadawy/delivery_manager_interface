@@ -2,6 +2,8 @@
 
 import 'dart:core';
 
+import 'package:delivery_manager_interface/core/helpers/to_double.dart';
+
 class PricePoint {
   int quantity;
   double price;
@@ -13,7 +15,7 @@ class PricePoint {
   }
 
   factory PricePoint.fromMap(Map<String, dynamic> map) {
-    return PricePoint(quantity: map['quantity'], price: map['price']);
+    return PricePoint(quantity: map['quantity'], price: toDouble(map['price']));
   }
 }
 
@@ -25,11 +27,11 @@ class Product {
   final String category;
   final int stock;
   final double price;
-  final int supplyPrice;
-  int? deliveryPrice;
+  final double supplyPrice;
+  double? deliveryPrice;
   double? marginRate;
-  int? shippingFee;
-  int? estimatedSettlement;
+  double? shippingFee;
+  double? estimatedSettlement;
   String? estimatedSettlementDate;
   final int baselineTime;
   final List<PricePoint> pricePoints;
@@ -69,13 +71,12 @@ class Product {
       productName: map['productName'] ?? '',
       instructions: map['instructions'] ?? '',
       stock: map['stock'] ?? 0,
-      supplyPrice: map['supplyPrice'] ?? 0,
+      supplyPrice: toDouble(map['supplyPrice']),
       price:
-          (map['pricePoints'] as List?)
+        toDouble((map['pricePoints'] as List?)
               ?.map((pp) => PricePoint.fromMap(pp))
               .toList()[0]
-              .price ??
-          0,
+              .price),
       baselineTime: map['baselineTime'] ?? 0,
       meridiem: map['meridiem'] ?? 'AM',
       imgUrl: map['imgUrl'],
@@ -89,10 +90,10 @@ class Product {
           [],
       freeShipping: map['freeShipping'] ?? false,
       deliveryManagerId: map['deliveryManagerId'] ?? '',
-      deliveryPrice: map['deliveryPrice'] ?? 0,
-      marginRate: map['marginRate'] ?? 0,
-      shippingFee: map['shippingFee'] ?? 0,
-      estimatedSettlement: map['estimatedSettlement'] ?? 0,
+      deliveryPrice: toDouble(map['deliveryPrice']),
+      marginRate: toDouble(map['marginRate']),
+      shippingFee: toDouble(map['shippingFee']),
+      estimatedSettlement: map['estimatedSettlement'],
       estimatedSettlementDate: map['estimatedSettlementDate'] ?? '',
     );
   }

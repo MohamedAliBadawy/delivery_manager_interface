@@ -1,3 +1,4 @@
+import 'package:delivery_manager_interface/core/helpers/to_double.dart';
 import 'package:intl/intl.dart';
 
 class MyOrder {
@@ -83,7 +84,7 @@ class MyOrder {
       paymentMethod: doc['paymentMethod'] ?? '',
       productId: doc['productId'] ?? '',
       quantity: doc['quantity'] ?? 0,
-      totalPrice: doc['totalPrice'] ?? 0.0,
+      totalPrice: toDouble(doc['totalPrice']) ?? 0.0,
       orderDate: doc['orderDate'] ?? '',
       trackingEvents: doc['trackingEvents'] ?? {},
       trackingNumber: doc['trackingNumber'] ?? '',
