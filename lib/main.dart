@@ -581,181 +581,183 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              IntrinsicHeight(
-                child:
-                    MediaQuery.of(context).size.width < 800
-                        ? Column(
-                          children: [
-                            // Manager Information
-                            buildManagerInfo(widget.uid),
-                            SizedBox(height: 20),
-                            // Products Information
-                            _buildProductsInfo(),
-                          ],
-                        )
-                        : Row(
-                          children: [
-                            Flexible(
-                              flex: 1,
-                              child: buildManagerInfo(widget.uid),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                IntrinsicHeight(
+                  child:
+                      MediaQuery.of(context).size.width < 800
+                          ? Column(
+                            children: [
+                              // Manager Information
+                              buildManagerInfo(widget.uid),
+                              SizedBox(height: 20),
+                              // Products Information
+                              _buildProductsInfo(),
+                            ],
+                          )
+                          : Row(
+                            children: [
+                              Flexible(
+                                flex: 1,
+                                child: buildManagerInfo(widget.uid),
+                              ),
+                              Flexible(flex: 3, child: _buildProductsInfo()),
+                            ],
+                          ),
+                ),
+                SizedBox(height: 24.h),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+        
+                  child: SizedBox(
+                    width: 600,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.black,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(0),
                             ),
-                            Flexible(flex: 3, child: _buildProductsInfo()),
-                          ],
-                        ),
-              ),
-              SizedBox(height: 24.h),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-
-                child: SizedBox(
-                  width: 600,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.black,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(0),
+                            minimumSize: Size(110.w, 40),
                           ),
-                          minimumSize: Size(110.w, 40),
+                          onPressed: _downloadOrdersAsExcel,
+                          child: Text('주문 엑셀 다운로드'),
                         ),
-                        onPressed: _downloadOrdersAsExcel,
-                        child: Text('주문 엑셀 다운로드'),
-                      ),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.black,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(0),
-                          ),
-                          minimumSize: Size(110.w, 40),
-                        ),
-                        onPressed: _uploadTrackingExcel,
-                        child: Text('엑셀에서 택배사 및 운송장 번호 업로드'),
-                      ),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(0),
-                          ),
-                          minimumSize: Size(110.w, 40),
-                        ),
-                        onPressed: () async {
-                          await FirebaseAuth.instance.signOut();
-                          Navigator.of(context).pushAndRemoveUntil(
-                            MaterialPageRoute(
-                              builder: (context) => LoginScreen(),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.black,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(0),
                             ),
-                            (route) => false,
-                          );
-                        },
-                        child: Text('로그아웃'),
-                      ),
-                    ],
+                            minimumSize: Size(110.w, 40),
+                          ),
+                          onPressed: _uploadTrackingExcel,
+                          child: Text('엑셀에서 택배사 및 운송장 번호 업로드'),
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(0),
+                            ),
+                            minimumSize: Size(110.w, 40),
+                          ),
+                          onPressed: () async {
+                            await FirebaseAuth.instance.signOut();
+                            Navigator.of(context).pushAndRemoveUntil(
+                              MaterialPageRoute(
+                                builder: (context) => LoginScreen(),
+                              ),
+                              (route) => false,
+                            );
+                          },
+                          child: Text('로그아웃'),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              SizedBox(height: 24.h),
-              // Tabs for order stages
-              StatefulBuilder(
-                builder: (context, setLocalState) {
-                  return Column(
-                    children: [
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-
-                        child: SizedBox(
-                          width: 1600,
-
-                          child: DefaultTabController(
-                            length: 5,
-                            child: TabBar(
-                              labelColor: Colors.black,
-                              unselectedLabelColor: Colors.grey,
-                              indicatorColor: Colors.transparent,
-                              tabs: const [
-                                Tab(text: '신규주문'),
-                                Tab(text: '배송준비중'),
-                                Tab(text: '배송중'),
-                                Tab(text: '배송완료'),
-                                Tab(text: '교환 반품요청'),
-                              ],
-                              onTap: (index) {
-                                setLocalState(() {
-                                  _currentTabIndex = index;
-                                });
-                              },
+                SizedBox(height: 24.h),
+                // Tabs for order stages
+                StatefulBuilder(
+                  builder: (context, setLocalState) {
+                    return Column(
+                      children: [
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+        
+                          child: SizedBox(
+                            width: 1600,
+        
+                            child: DefaultTabController(
+                              length: 5,
+                              child: TabBar(
+                                labelColor: Colors.black,
+                                unselectedLabelColor: Colors.grey,
+                                indicatorColor: Colors.transparent,
+                                tabs: const [
+                                  Tab(text: '신규주문'),
+                                  Tab(text: '배송준비중'),
+                                  Tab(text: '배송중'),
+                                  Tab(text: '배송완료'),
+                                  Tab(text: '교환 반품요청'),
+                                ],
+                                onTap: (index) {
+                                  setLocalState(() {
+                                    _currentTabIndex = index;
+                                  });
+                                },
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      ordersTableHeader(_headerScrollController),
-                      SizedBox(
-                        height: 400, // adjust as needed for table body
-
-                        child: StreamBuilder<QuerySnapshot>(
-                          stream:
-                              FirebaseFirestore.instance
-                                  .collection('orders')
-                                  .where(
-                                    'deliveryManagerId',
-                                    isEqualTo: widget.uid,
-                                  )
-                                  .snapshots(),
-                          builder: (context, snapshot) {
-                            if (snapshot.hasError) {
-                              return Center(
-                                child: Text('Error: ${snapshot.error}'),
-                              );
-                            }
-                            // 3. Check for null data
-                            if (!snapshot.hasData || snapshot.data == null) {
-                              return Center(child: Text('주문이 없습니다'));
-                            }
-                            final orders = snapshot.data!.docs;
-
-                            if (orders.isEmpty) {
-                              return Center(child: Text('주문이 없습니다'));
-                            }
-                            return _buildOrderTableForStatus(
-                              _currentTabIndex,
-                            ); /* SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              controller: _bodyScrollController,
-                              child: SizedBox(
-                                width: 1600,
-
-                                child: ListView.builder(
-                                  itemCount: orders.length,
-                                  itemBuilder: (context, index) {
-                                    final order = MyOrder.fromDocument(
-                                      orders[index].data()
-                                          as Map<String, dynamic>,
-                                    );
-                                    return _buildOrderRow(order);
-                                  },
+                        ordersTableHeader(_headerScrollController),
+                        SizedBox(
+                          height: 400, // adjust as needed for table body
+        
+                          child: StreamBuilder<QuerySnapshot>(
+                            stream:
+                                FirebaseFirestore.instance
+                                    .collection('orders')
+                                    .where(
+                                      'deliveryManagerId',
+                                      isEqualTo: widget.uid,
+                                    )
+                                    .snapshots(),
+                            builder: (context, snapshot) {
+                              if (snapshot.hasError) {
+                                return Center(
+                                  child: Text('Error: ${snapshot.error}'),
+                                );
+                              }
+                              // 3. Check for null data
+                              if (!snapshot.hasData || snapshot.data == null) {
+                                return Center(child: Text('주문이 없습니다'));
+                              }
+                              final orders = snapshot.data!.docs;
+        
+                              if (orders.isEmpty) {
+                                return Center(child: Text('주문이 없습니다'));
+                              }
+                              return _buildOrderTableForStatus(
+                                _currentTabIndex,
+                              ); /* SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                controller: _bodyScrollController,
+                                child: SizedBox(
+                                  width: 1600,
+        
+                                  child: ListView.builder(
+                                    itemCount: orders.length,
+                                    itemBuilder: (context, index) {
+                                      final order = MyOrder.fromDocument(
+                                        orders[index].data()
+                                            as Map<String, dynamic>,
+                                      );
+                                      return _buildOrderRow(order);
+                                    },
+                                  ),
                                 ),
-                              ),
-                            ); */
-                          },
+                              ); */
+                            },
+                          ),
                         ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ],
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ),
