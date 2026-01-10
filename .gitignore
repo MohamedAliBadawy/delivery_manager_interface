@@ -34,7 +34,7 @@ migrate_working_dir/
 .pub/
 /build/
 /linux/
-
+/windows/
 # Symbolication related
 app.*.symbols
 
