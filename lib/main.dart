@@ -2,7 +2,9 @@ import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delivery_manager_interface/core/constants.dart';
+import 'package:delivery_manager_interface/direct_chats_screen.dart';
 import 'package:delivery_manager_interface/loading_dialog.dart';
+import 'package:delivery_manager_interface/models/chat_room_model.dart';
 import 'package:delivery_manager_interface/models/order_model.dart';
 import 'package:delivery_manager_interface/models/product_model.dart';
 import 'package:delivery_manager_interface/models/user_model.dart';
@@ -384,6 +386,56 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
     );
   }
 
+  Widget buildMessagesIcon() {
+    return StreamBuilder(
+      stream: FirebaseFirestore.instance
+          .collection('chatRooms')
+          .where('participants', arrayContains: widget.uid)
+          .orderBy('lastMessageTime', descending: true)
+          .snapshots()
+          .map(
+            (snapshot) =>
+                snapshot.docs
+                    .map((doc) => ChatRoomModel.fromMap(doc.data()))
+                    .toList(),
+          ),
+      builder: (context, snapshot) {
+        final currentUserId = widget.uid;
+        bool hasUnread = false;
+        if (snapshot.hasData) {
+          final chatRooms = snapshot.data!;
+          hasUnread = chatRooms.any(
+            (room) => (room.unreadCount[currentUserId] ?? 0) > 0,
+          );
+        }
+        return InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => DirectChatsScreen()),
+            );
+          },
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              ImageIcon(AssetImage('assets/005 3.png'), size: 24),
+              if (hasUnread)
+                Positioned(
+                  left: -10,
+                  top: -5,
+                  child: Image.asset(
+                    'assets/notification.png',
+                    width: 18,
+                    height: 18,
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _downloadOrdersAsExcel() async {
     final querySnapshot =
         await FirebaseFirestore.instance
@@ -588,15 +640,14 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                buildMessagesIcon(),
                 IntrinsicHeight(
                   child:
                       MediaQuery.of(context).size.width < 800
                           ? Column(
                             children: [
-                              // Manager Information
                               buildManagerInfo(widget.uid),
                               SizedBox(height: 20),
-                              // Products Information
                               _buildProductsInfo(),
                             ],
                           )
@@ -613,7 +664,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                 SizedBox(height: 24.h),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
-        
+
                   child: SizedBox(
                     width: 600,
                     child: Row(
@@ -675,10 +726,10 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                       children: [
                         SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
-        
+
                           child: SizedBox(
                             width: 1600,
-        
+
                             child: DefaultTabController(
                               length: 5,
                               child: TabBar(
@@ -704,7 +755,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                         ordersTableHeader(_headerScrollController),
                         SizedBox(
                           height: 400, // adjust as needed for table body
-        
+
                           child: StreamBuilder<QuerySnapshot>(
                             stream:
                                 FirebaseFirestore.instance
@@ -725,7 +776,7 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
                                 return Center(child: Text('주문이 없습니다'));
                               }
                               final orders = snapshot.data!.docs;
-        
+
                               if (orders.isEmpty) {
                                 return Center(child: Text('주문이 없습니다'));
                               }

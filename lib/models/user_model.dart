@@ -3,28 +3,71 @@ import 'package:intl/intl.dart';
 
 class MyUser {
   String userId;
-
   String email;
-
   String name;
-
   String url;
-  List? blocked = [];
-
-  Timestamp? createdAt;
-
+  List<String>? blocked;
   bool isSub;
-
+  String? defaultAddressId;
+  String? payerId;
+  final bool isOnline;
+  final DateTime lastSeen;
+  final List<String> chatRooms;
+  final List<String> friends;
+  final List<String> friendRequestsSent;
+  final List<String> friendRequestsReceived;
+  final int followerCount;
+  final int followingCount;
+  String? phoneNumber;
+  String? bio;
+  String type;
   MyUser({
     required this.userId,
     required this.email,
     required this.name,
     required this.url,
-    this.blocked,
-    this.createdAt,
-    required this.isSub,
+    this.blocked = const [],
+    this.isSub = false,
+    this.defaultAddressId,
+    this.payerId,
+    this.isOnline = false,
+    required this.lastSeen,
+    this.chatRooms = const [],
+    this.friends = const [],
+    this.friendRequestsSent = const [],
+    this.friendRequestsReceived = const [],
+    this.followerCount = 0,
+    this.followingCount = 0,
+
+    this.bio,
+    this.phoneNumber,
+    this.type = 'user',
   });
 
+  static final empty = MyUser(
+    userId: '',
+    email: '',
+    name: '',
+    url: '',
+    blocked: [],
+    defaultAddressId: '',
+    isSub: false,
+    payerId: '',
+    isOnline: false,
+    lastSeen: DateTime.now(),
+    chatRooms: const [],
+    friends: const [],
+    friendRequestsSent: const [],
+    friendRequestsReceived: const [],
+    followerCount: 0,
+    followingCount: 0,
+
+    bio: '',
+    phoneNumber: '',
+    type: 'user',
+  );
+
+  // Database serialization methods (from MyUserEntity)
   Map<String, Object?> toDocument() {
     return {
       'userId': userId,
@@ -32,24 +75,98 @@ class MyUser {
       'name': name,
       'url': url,
       'blocked': blocked,
-      'createdAt': createdAt ?? FieldValue.serverTimestamp(),
       'isSub': isSub,
+      'defaultAddressId': defaultAddressId ?? '',
+      'payerId': payerId,
+      'isOnline': isOnline,
+      'lastSeen': lastSeen.millisecondsSinceEpoch,
+      'chatRooms': chatRooms,
+      'friends': friends,
+      'friendRequestsSent': friendRequestsSent,
+      'friendRequestsReceived': friendRequestsReceived,
+      'followerCount': followerCount,
+      'followingCount': followingCount,
+      'bio': bio,
+      'phoneNumber': phoneNumber,
+      'type': type,
     };
   }
 
   static MyUser fromDocument(Map<String, dynamic> doc) {
     return MyUser(
-      userId: doc['userId'],
-      email: doc['email'],
-      name: doc['name'],
-      url: doc['url'],
-      blocked: doc['blocked'] ?? [],
-      createdAt: doc['createdAt'],
-      isSub: doc['isSub'],
+      userId: (doc['userId'] ?? '') as String,
+      email: (doc['email'] ?? '') as String,
+      name: (doc['name'] ?? '삭제된 사용자') as String,
+      url: (doc['url'] ?? '') as String,
+      blocked:
+          (doc['blocked'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          [],
+      isSub: doc['isSub'] ?? false,
+      defaultAddressId: (doc['defaultAddressId'] ?? '') as String?,
+      payerId: (doc['payerId'] ?? '') as String?,
+      isOnline: doc['isOnline'] ?? false,
+      lastSeen: DateTime.fromMillisecondsSinceEpoch(doc['lastSeen'] ?? 0),
+      chatRooms: List<String>.from(doc['chatRooms'] ?? []),
+      friends: List<String>.from(doc['friends'] ?? []),
+      friendRequestsSent: List<String>.from(doc['friendRequestsSent'] ?? []),
+      friendRequestsReceived: List<String>.from(
+        doc['friendRequestsReceived'] ?? [],
+      ),
+      followerCount: doc['followerCount'] ?? 0,
+      followingCount: doc['followingCount'] ?? 0,
+      bio: (doc['bio'] ?? '') as String?,
+      phoneNumber: (doc['phoneNumber'] ?? '') as String?,
+      type: (doc['type'] ?? 'user') as String,
     );
   }
 
-  String get formattedCreatedAt {
+  static MyUser fromSellerDocument(Map<String, dynamic> doc) {
+    return MyUser(
+      userId: (doc['userId'] ?? '') as String,
+      email: (doc['email'] ?? '') as String,
+      name: (doc['name'] ?? '삭제된 사용자') as String,
+      url: (doc['url'] ?? 'https://i.ibb.co/mrVrHy7z/avatar.png') as String,
+      blocked:
+          (doc['blocked'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          [],
+      isSub: doc['isSub'] ?? false,
+      defaultAddressId: (doc['defaultAddressId'] ?? '') as String?,
+      payerId: (doc['payerId'] ?? '') as String?,
+      isOnline: doc['isOnline'] ?? false,
+      lastSeen: DateTime.fromMillisecondsSinceEpoch(doc['lastSeen'] ?? 0),
+      chatRooms: List<String>.from(doc['chatRooms'] ?? []),
+      friends: List<String>.from(doc['friends'] ?? []),
+      friendRequestsSent: List<String>.from(doc['friendRequestsSent'] ?? []),
+      friendRequestsReceived: List<String>.from(
+        doc['friendRequestsReceived'] ?? [],
+      ),
+      followerCount: doc['followerCount'] ?? 0,
+      followingCount: doc['followingCount'] ?? 0,
+      bio: (doc['bio'] ?? '') as String?,
+      phoneNumber: (doc['phoneNumber'] ?? '') as String?,
+      type: (doc['type'] ?? 'user') as String,
+    );
+  }
+
+  // Keep these methods for backward compatibility if needed elsewhere
+  MyUser toEntity() {
+    return this; // Returns itself since it's now the same class
+  }
+
+  static MyUser fromEntity(MyUser entity) {
+    return entity; // Returns the same instance
+  }
+
+  @override
+  String toString() {
+    return 'MyUser:$userId,$email,$name,$url';
+  }
+
+  /*   String get formattedCreatedAt {
     if (createdAt == null) return 'Not available';
 
     final dateTime = createdAt!.toDate();
@@ -57,5 +174,5 @@ class MyUser {
       'MM/dd/yyyy, hh:mm a',
     ); // Customize format as needed
     return formatter.format(dateTime);
-  }
+  } */
 }
