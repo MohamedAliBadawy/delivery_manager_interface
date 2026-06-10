@@ -48,7 +48,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions web = FirebaseOptions(
     apiKey: 'AIzaSyDdVBrcwkQzcu3YgHaUUrUZA4L_8pZC4wk',
-    appId: '1:944685668832:web:cc5abf2cac157833eaf385',
+    appId: '1:944685668832:web:42043787ea60e2c8eaf385',
     messagingSenderId: '944685668832',
     projectId: 'e-commerce-app-34fb2',
     authDomain: 'e-commerce-app-34fb2.firebaseapp.com',
@@ -57,7 +57,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyBhl_S1tHZwdiRnz9VXt5f0bzORzha8Ch0',
-    appId: '1:944685668832:android:c2a5128c8b859fa8eaf385',
+    appId: '1:944685668832:android:2c71ba46789b9c13eaf385',
     messagingSenderId: '944685668832',
     projectId: 'e-commerce-app-34fb2',
     storageBucket: 'e-commerce-app-34fb2.firebasestorage.app',

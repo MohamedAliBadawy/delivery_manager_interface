@@ -12,6 +12,7 @@ class ChatRoomModel {
   final String? createdBy;
   final DateTime createdAt;
   final Map<String, int> unreadCount; // userId -> unread count
+  final String status; // 'ongoing' or 'completed'
 
   ChatRoomModel({
     required this.id,
@@ -26,6 +27,7 @@ class ChatRoomModel {
     this.deletedBy = const [],
     required this.createdAt,
     this.unreadCount = const {},
+    this.status = 'ongoing',
   });
 
   factory ChatRoomModel.fromMap(Map<String, dynamic> map) {
@@ -44,6 +46,7 @@ class ChatRoomModel {
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] ?? 0),
       unreadCount: Map<String, int>.from(map['unreadCount'] ?? {}),
       deletedBy: List<String>.from(map['deletedBy'] ?? []),
+      status: map['status'] ?? 'ongoing',
     );
   }
 
@@ -61,6 +64,7 @@ class ChatRoomModel {
       'createdAt': createdAt.millisecondsSinceEpoch,
       'unreadCount': unreadCount,
       'deletedBy': deletedBy,
+      'status': status,
     };
   }
 }

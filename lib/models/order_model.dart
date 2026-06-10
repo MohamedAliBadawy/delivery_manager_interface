@@ -22,6 +22,8 @@ class MyOrder {
   String phoneNo;
   bool confirmed;
   String carrierId;
+  String? exchangeReason;
+  String? exchangeStatus;
 
   MyOrder({
     required this.orderId,
@@ -44,6 +46,8 @@ class MyOrder {
     required this.phoneNo,
     required this.confirmed,
     required this.carrierId,
+    this.exchangeReason,
+    this.exchangeStatus,
   });
 
   Map<String, Object?> toDocument() {
@@ -68,6 +72,8 @@ class MyOrder {
       'phoneNo': phoneNo,
       'confirmed': confirmed,
       'carrierId': carrierId,
+      'exchangeReason': exchangeReason,
+      'exchangeStatus': exchangeStatus,
     };
   }
 
@@ -93,6 +99,8 @@ class MyOrder {
       phoneNo: doc['phoneNo'] ?? '',
       confirmed: doc['confirmed'] ?? false,
       carrierId: doc['carrierId'] ?? '',
+      exchangeReason: doc['exchangeReason'],
+      exchangeStatus: doc['exchangeStatus'],
     );
   }
 

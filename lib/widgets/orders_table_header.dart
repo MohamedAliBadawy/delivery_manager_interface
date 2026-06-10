@@ -19,22 +19,22 @@ Widget ordersTableHeader(ScrollController headerScrollController) {
           children: [
             TableRow(
               children: [
-                buildTableHeader('날짜'),
-                buildTableHeader('주문 ID'),
-                buildTableHeader('수취인'),
-                buildTableHeader('전화번호'),
-                buildTableHeader('주소'),
-                buildTableHeader('상세주소'),
-                buildTableHeader('배송 요청사항'),
-                buildTableHeader('제품'),
-                buildTableHeader('수량'),
-                buildTableHeader('가격'),
-                buildTableHeader('공급가'),
-                buildTableHeader('배송비'),
-                buildTableHeader('도서산간 추가 배송비'),
+                buildTableHeader('날짜'), // Date
+                buildTableHeader('주문 ID'), // Order ID
+                buildTableHeader('수취인'), // Recipient Name
+                buildTableHeader('전화번호'), // Phone Number
+                buildTableHeader('주소'), // Address
+                buildTableHeader('상세주소'), // Detailed Address
+                buildTableHeader('배송 요청사항'), // Delivery Request / Instructions
+                buildTableHeader('제품'), // Product
+                buildTableHeader('수량'), // Quantity
+                buildTableHeader('가격'), // Price
+                buildTableHeader('공급가'), // Supply Price
+                buildTableHeader('배송비'), // Delivery Fee / Shipping Fee
+                buildTableHeader('도서산간 추가 배송비'), // Additional Remote Area Delivery Fee
                 /*  _buildTableHeader('Estimated settlement'), */
-                buildTableHeader('택배사'),
-                buildTableHeader('운송장 번호'),
+                buildTableHeader('택배사'), // Courier / Carrier
+                buildTableHeader('운송장 번호'), // Tracking Number
                 buildTableHeader(''),
                 buildTableHeader(''),
               ],
