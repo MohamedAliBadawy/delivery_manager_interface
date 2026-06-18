@@ -96,28 +96,8 @@ class _LoginScreenState extends State<LoginScreen> {
       // Maintain consistency check in Firestore
       final dmDoc = await _firestore.collection('deliveryManagers').doc(uid).get();
       if (!dmDoc.exists) {
-        await _firestore.collection('deliveryManagers').doc(uid).set({
-          'uid': uid,
-          'email': targetEmail,
-          'name': '테스트 매니저',
-          'phoneNumber': '010-1234-5678',
-          'accountNumber': '국민은행 123-45678-90123',
-          'emailAddress': targetEmail,
-          'businessNumber': inputId.contains('@') ? '123-45-67890' : inputId,
-        });
-      }
-
-      final uDoc = await _firestore.collection('users').doc(uid).get();
-      if (!uDoc.exists) {
-        await _firestore.collection('users').doc(uid).set({
-          'uid': uid,
-          'email': targetEmail,
-          'name': '테스트 매니저',
-          'phoneNo': '010-1234-5678',
-          'deliveryAddress': '서울시 강남구 역삼동',
-          'deliveryAddressDetail': '101호',
-          'userType': 'deliveryManager',
-        });
+        await _auth.signOut();
+        throw Exception(tr('pe_taxable') == '과세' ? '판매자 정보가 존재하지 않습니다. 관리자에게 문의하세요.' : 'Seller information not found. Please contact support.');
       }
 
       if (!mounted) return;
