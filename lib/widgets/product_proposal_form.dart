@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:io';
 import 'package:delivery_manager_interface/core/localization.dart';
 
 class ProductProposalForm extends StatefulWidget {
@@ -46,6 +50,49 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
   // Image slots
   String? _mainImageUrl;
   List<String> _additionalImageUrls = ['', '', '', ''];
+  final List<bool> _isUploadingImage = [false, false, false, false, false];
+
+  List<Map<String, dynamic>> _categories = [];
+  bool _isLoadingCategories = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCategories();
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('categories')
+          .orderBy('order')
+          .get();
+      if (mounted) {
+        setState(() {
+          _categories = snap.docs.map((doc) {
+            return {
+              'id': doc.id,
+              'name': doc.data()['name'] ?? '',
+              'order': doc.data()['order'] ?? 0,
+            };
+          }).toList();
+          _isLoadingCategories = false;
+          if (_categories.isNotEmpty) {
+            final names = _categories.map((c) => c['name'] as String).toList();
+            if (!names.contains(_category)) {
+              _category = names.first;
+            }
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingCategories = false;
+        });
+      }
+    }
+  }
 
   void _addPricePoint() {
     if (_pricePoints.length >= 5) {
@@ -88,58 +135,98 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
     });
   }
 
-  void _showImageUrlDialog(int slotIndex, bool isMain) {
-    final controller = TextEditingController(
-      text: isMain ? _mainImageUrl : _additionalImageUrls[slotIndex],
+  Future<void> _pickAndUploadImage(int slotIndex, bool isMain) async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
     );
-    showDialog(
+
+    if (pickedFile == null) return;
+
+    final overallIndex = isMain ? 0 : slotIndex + 1;
+    setState(() {
+      _isUploadingImage[overallIndex] = true;
+    });
+
+    try {
+      final String filename = 'prod_${widget.uid}_${DateTime.now().millisecondsSinceEpoch}_$overallIndex.jpg';
+      final ref = FirebaseStorage.instance.ref().child('product_images/$filename');
+
+      if (kIsWeb) {
+        final bytes = await pickedFile.readAsBytes();
+        await ref.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
+      } else {
+        await ref.putFile(File(pickedFile.path));
+      }
+
+      final url = await ref.getDownloadURL();
+
+      if (mounted) {
+        setState(() {
+          if (isMain) {
+            _mainImageUrl = url;
+          } else {
+            _additionalImageUrls[slotIndex] = url;
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('업로드 실패: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingImage[overallIndex] = false;
+        });
+      }
+    }
+  }
+
+  void _showImageOptions(int slotIndex, bool isMain) {
+    final url = isMain ? _mainImageUrl : _additionalImageUrls[slotIndex];
+    final hasImage = url != null && url.isNotEmpty;
+
+    showModalBottomSheet(
       context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+      backgroundColor: Colors.white,
       builder: (context) {
-        return AlertDialog(
-          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-          title: Text(
-            isMain
-                ? tr('pe_enter_main_image_url')
-                : tr(
-                  'pe_enter_add_image_url',
-                ).replaceAll('{index}', '${slotIndex + 1}'),
-          ),
-          content: TextField(
-            controller: controller,
-            decoration: const InputDecoration(
-              hintText: 'https://example.com/image.png',
-              border: OutlineInputBorder(borderRadius: BorderRadius.zero),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                tr('cancel'),
-                style: const TextStyle(color: Colors.black),
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_library, color: Colors.black),
+                title: Text(tr('pe_taxable') == '과세' ? '사진 변경' : 'Change Image'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickAndUploadImage(slotIndex, isMain);
+                },
               ),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black,
-                foregroundColor: Colors.white,
-                shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.zero,
+              if (hasImage)
+                ListTile(
+                  leading: const Icon(Icons.delete, color: Colors.red),
+                  title: Text(
+                    tr('pe_taxable') == '과세' ? '사진 삭제' : 'Delete Image',
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                  onTap: () {
+                    setState(() {
+                      if (isMain) {
+                        _mainImageUrl = null;
+                      } else {
+                        _additionalImageUrls[slotIndex] = '';
+                      }
+                    });
+                    Navigator.pop(context);
+                  },
                 ),
-              ),
-              onPressed: () {
-                setState(() {
-                  if (isMain) {
-                    _mainImageUrl = controller.text.trim();
-                  } else {
-                    _additionalImageUrls[slotIndex] = controller.text.trim();
-                  }
-                });
-                Navigator.pop(context);
-              },
-              child: Text(tr('pe_taxable') == '과세' ? '적용' : 'Apply'),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );
@@ -413,41 +500,53 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
 
             // 3. 카테고리 선택
             _buildSectionHeader(tr('pe_category_select')),
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.black, width: 1),
-              ),
-              child: Row(
-                children:
-                    [
-                      MapEntry('식품', tr('pe_food')),
-                      MapEntry('생활', tr('pe_life')),
-                      MapEntry('기타', tr('pe_other')),
-                    ].map((entry) {
-                      final catValue = entry.key;
-                      final catDisplay = entry.value;
-                      final isSelected = _category == catValue;
-                      return Expanded(
-                        child: InkWell(
-                          onTap: () => setState(() => _category = catValue),
-                          child: Container(
-                            height: 40,
-                            color: isSelected ? Colors.black : Colors.white,
-                            alignment: Alignment.center,
-                            child: Text(
-                              catDisplay,
-                              style: TextStyle(
-                                color: isSelected ? Colors.white : Colors.black,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
+            _isLoadingCategories
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(8.0),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.black,
+                      ),
+                    ),
+                  )
+                : _categories.isEmpty
+                    ? const Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: Text(
+                          '등록된 카테고리가 없습니다.',
+                          style: TextStyle(color: Colors.grey),
                         ),
-                      );
-                    }).toList(),
-              ),
-            ),
+                      )
+                    : Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.black, width: 1),
+                        ),
+                        child: Row(
+                          children: _categories.map((cat) {
+                            final catValue = cat['name'] as String;
+                            final isSelected = _category == catValue;
+                            return Expanded(
+                              child: InkWell(
+                                onTap: () => setState(() => _category = catValue),
+                                child: Container(
+                                  height: 40,
+                                  color: isSelected ? Colors.black : Colors.white,
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    catValue,
+                                    style: TextStyle(
+                                      color: isSelected ? Colors.white : Colors.black,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
             const SizedBox(height: 20),
 
             // 4. 상품명
@@ -1020,7 +1119,7 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
                         );
                       }).toList(),
                 ),
-                TableRow(
+                 TableRow(
                   children: List.generate(5, (index) {
                     final isMain = index == 0;
                     final url =
@@ -1028,34 +1127,53 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
                             ? _mainImageUrl
                             : _additionalImageUrls[index - 1];
                     final hasImage = url != null && url.isNotEmpty;
+                    final isUploading = _isUploadingImage[index];
 
                     return InkWell(
-                      onTap:
-                          () => _showImageUrlDialog(
-                            isMain ? 0 : index - 1,
-                            isMain,
-                          ),
+                      onTap: isUploading
+                          ? null
+                          : () {
+                              if (hasImage) {
+                                _showImageOptions(
+                                  isMain ? 0 : index - 1,
+                                  isMain,
+                                );
+                              } else {
+                                _pickAndUploadImage(
+                                  isMain ? 0 : index - 1,
+                                  isMain,
+                                );
+                              }
+                            },
                       child: Container(
                         height: 80,
                         alignment: Alignment.center,
-                        child:
-                            hasImage
-                                ? Image.network(
-                                  url,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (c, o, s) {
-                                    return const Icon(
-                                      Icons.broken_image,
-                                      size: 24,
-                                      color: Colors.grey,
-                                    );
-                                  },
-                                )
-                                : const Icon(
-                                  Icons.add,
-                                  size: 20,
-                                  color: Colors.black45,
+                        child: isUploading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.black,
                                 ),
+                              )
+                            : hasImage
+                                ? Image.network(
+                                    url,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (c, o, s) {
+                                      return const Icon(
+                                        Icons.broken_image,
+                                        size: 24,
+                                        color: Colors.grey,
+                                      );
+                                    },
+                                  )
+                                : const Icon(
+                                    Icons.add,
+                                    size: 20,
+                                    color: Colors.black45,
+                                  ),
                       ),
                     );
                   }),

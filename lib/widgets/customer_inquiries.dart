@@ -46,11 +46,27 @@ class _CustomerInquiriesWidgetState extends State<CustomerInquiriesWidget> {
 
   XFile? _pickedImage;
   bool _isSending = false;
+  String _managerName = '';
 
   @override
   void initState() {
     super.initState();
     _initChatRoomsStream();
+    _loadManagerName();
+  }
+
+  Future<void> _loadManagerName() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('deliveryManagers')
+          .doc(widget.uid)
+          .get();
+      if (doc.exists && mounted) {
+        setState(() {
+          _managerName = doc.data()?['name'] ?? '';
+        });
+      }
+    } catch (_) {}
   }
 
   void _initChatRoomsStream() {
@@ -125,7 +141,7 @@ class _CustomerInquiriesWidgetState extends State<CustomerInquiriesWidget> {
         'id': messageId,
         'chatRoomId': _selectedChatRoomId,
         'senderId': widget.uid,
-        'senderName': '테스트 매니저',
+        'senderName': _managerName.isNotEmpty ? _managerName : '매니저',
         'content': content,
         'imageUrl': imageUrl ?? '',
         'timestamp': DateTime.now().millisecondsSinceEpoch,

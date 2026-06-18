@@ -332,14 +332,13 @@ class _ManagerInfoWidgetState extends State<ManagerInfoWidget> {
         final manager = doc.data() as Map<String, dynamic>;
         final docId = doc.id;
 
-        final isKo = tr('pe_taxable') == '과세';
-        final brandName = manager['brandName'] ?? (isKo ? '테스트 브랜드' : 'Test Brand');
-        final repName = manager['name'] ?? (isKo ? '테스트 매니저' : 'Test Representative');
-        final repContact = manager['phoneNumber'] ?? '010-1234-5678';
-        final idEmail = manager['email'] ?? 'test@example.com';
-        final settlementAcc = manager['accountNumber'] ?? '국민은행 123-45678-90123';
-        final bizNumber = manager['businessNumber'] ?? '123-45-67890';
-        final compName = manager['companyName'] ?? (isKo ? '(주) 테스트컴퍼니' : 'Test Company Co.');
+        final brandName = manager['brandName'] ?? '';
+        final repName = manager['name'] ?? '';
+        final repContact = manager['phoneNumber'] ?? '';
+        final idEmail = manager['email'] ?? '';
+        final settlementAcc = manager['accountNumber'] ?? '';
+        final bizNumber = manager['businessNumber'] ?? '';
+        final compName = manager['companyName'] ?? '';
         final emailAddress = manager['emailAddress'] ?? idEmail;
 
         return SingleChildScrollView(
