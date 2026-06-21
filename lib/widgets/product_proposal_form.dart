@@ -6,6 +6,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:io';
 import 'package:delivery_manager_interface/core/localization.dart';
+import 'package:delivery_manager_interface/widgets/proposal_list_tab.dart';
+import 'package:delivery_manager_interface/services/kakao_service.dart';
+import 'package:delivery_manager_interface/widgets/address_search_dialog.dart';
 
 class ProductProposalForm extends StatefulWidget {
   final String uid;
@@ -30,16 +33,15 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
   double _returnDeliveryPrice = 5000.0;
   double _freeShippingThreshold = 20000.0;
   bool _noFreeShipping = false;
-  int _maxPackagingQuantity = 50;
+  int _maxPackagingQuantity = 1;
   bool _isSingleQuantity = false;
 
   // Dynamic list of price options (Custom quantities)
   List<Map<String, dynamic>> _pricePoints = [
-    {'quantity': 1, 'price': 14000.0},
-    {'quantity': 2, 'price': 24000.0},
-    {'quantity': 3, 'price': 34000.0},
-    {'quantity': 50, 'price': 54000.0, 'isMax': true},
+    {'quantity': 1, 'price': 14000.0, 'isMax': true},
   ];
+
+  Map<String, dynamic>? _address;
 
   int _deliveryMinDays = 1;
   int _deliveryMaxDays = 3;
@@ -54,6 +56,7 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
 
   List<Map<String, dynamic>> _categories = [];
   bool _isLoadingCategories = true;
+  int _proposalSubTabIndex = 1; // 0 for '제안 목록', 1 for '상품 입점 제안'
 
   @override
   void initState() {
@@ -63,19 +66,21 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
 
   Future<void> _loadCategories() async {
     try {
-      final snap = await FirebaseFirestore.instance
-          .collection('categories')
-          .orderBy('order')
-          .get();
+      final snap =
+          await FirebaseFirestore.instance
+              .collection('categories')
+              .orderBy('order')
+              .get();
       if (mounted) {
         setState(() {
-          _categories = snap.docs.map((doc) {
-            return {
-              'id': doc.id,
-              'name': doc.data()['name'] ?? '',
-              'order': doc.data()['order'] ?? 0,
-            };
-          }).toList();
+          _categories =
+              snap.docs.map((doc) {
+                return {
+                  'id': doc.id,
+                  'name': doc.data()['name'] ?? '',
+                  'order': doc.data()['order'] ?? 0,
+                };
+              }).toList();
           _isLoadingCategories = false;
           if (_categories.isNotEmpty) {
             final names = _categories.map((c) => c['name'] as String).toList();
@@ -94,42 +99,46 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
     }
   }
 
+  void searchAddress() async {
+    final kakaoService = KakaoApiService(
+      apiKey: '772742afea4cfac8c58ed62cfa7d1777',
+    );
+
+    final result = await showDialog(
+      context: context,
+      builder: (context) => AddressSearchDialog(kakaoService: kakaoService),
+    );
+
+    if (!mounted) return;
+
+    if (result != null && result is Map<String, dynamic>) {
+      setState(() {
+        _address = result;
+      });
+    }
+  }
+
   void _addPricePoint() {
+    if (_isSingleQuantity || _maxPackagingQuantity <= 1) return;
     if (_pricePoints.length >= 5) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(tr('pe_option_limit_error'))));
       return;
     }
-    if (_isSingleQuantity) return; // cannot add options in single quantity mode
-    int defaultQty = 1;
-    final maxAllowedQty = _maxPackagingQuantity - 1;
-    while (_pricePoints.any((pt) => pt['quantity'] == defaultQty) ||
-        defaultQty >= _maxPackagingQuantity) {
-      defaultQty++;
-    }
-    if (defaultQty > maxAllowedQty) {
-      int foundSlot = -1;
-      for (int q = 1; q <= maxAllowedQty; q++) {
-        if (!_pricePoints.any((pt) => pt['quantity'] == q)) {
-          foundSlot = q;
-          break;
-        }
-      }
-      if (foundSlot != -1) {
-        defaultQty = foundSlot;
-      } else {
-        return;
-      }
-    }
+    if (_pricePoints.length >= _maxPackagingQuantity) return;
     setState(() {
       // Insert before the last item (which is the max packaging quantity row)
-      _pricePoints.insert(_pricePoints.length - 1, {'quantity': defaultQty, 'price': 10000.0});
+      _pricePoints.insert(_pricePoints.length - 1, {
+        'quantity': 1,
+        'price': 10000.0,
+      });
     });
   }
 
   void _removePricePoint(int index) {
-    if (_pricePoints[index]['isMax'] == true || _pricePoints.length <= 1) return;
+    if (_pricePoints[index]['isMax'] == true || _pricePoints.length <= 1)
+      return;
     setState(() {
       _pricePoints.removeAt(index);
     });
@@ -150,8 +159,11 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
     });
 
     try {
-      final String filename = 'prod_${widget.uid}_${DateTime.now().millisecondsSinceEpoch}_$overallIndex.jpg';
-      final ref = FirebaseStorage.instance.ref().child('product_images/$filename');
+      final String filename =
+          'prod_${widget.uid}_${DateTime.now().millisecondsSinceEpoch}_$overallIndex.jpg';
+      final ref = FirebaseStorage.instance.ref().child(
+        'product_images/$filename',
+      );
 
       if (kIsWeb) {
         final bytes = await pickedFile.readAsBytes();
@@ -174,7 +186,11 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('업로드 실패: $e')),
+          SnackBar(
+            content: Text(
+              tr('pe_upload_failed').replaceAll('{error}', e.toString()),
+            ),
+          ),
         );
       }
     } finally {
@@ -201,7 +217,7 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
             children: [
               ListTile(
                 leading: const Icon(Icons.photo_library, color: Colors.black),
-                title: Text(tr('pe_taxable') == '과세' ? '사진 변경' : 'Change Image'),
+                title: Text(tr('pe_change_image')),
                 onTap: () {
                   Navigator.pop(context);
                   _pickAndUploadImage(slotIndex, isMain);
@@ -211,7 +227,7 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
                 ListTile(
                   leading: const Icon(Icons.delete, color: Colors.red),
                   title: Text(
-                    tr('pe_taxable') == '과세' ? '사진 삭제' : 'Delete Image',
+                    tr('pe_delete_image'),
                     style: const TextStyle(color: Colors.red),
                   ),
                   onTap: () {
@@ -236,6 +252,15 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
     if (!_formKey.currentState!.validate()) return;
     _formKey.currentState!.save();
 
+    if (_shippingMethod == '지역배송' && _address == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(tr('pe_no_regions_selected')),
+        ),
+      );
+      return;
+    }
+
     final nav = Navigator.of(context);
     final sm = ScaffoldMessenger.of(context);
 
@@ -257,6 +282,24 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
               ),
             ),
       );
+
+      // Sort price points before constructing finalPricePoints
+      if (_pricePoints.length > 1) {
+        final maxPt = _pricePoints.firstWhere(
+          (pt) => pt['isMax'] == true,
+          orElse: () => _pricePoints.last,
+        );
+        final customPts =
+            _pricePoints.where((pt) => pt['isMax'] != true).toList();
+        customPts.sort((a, b) {
+          final aQty = a['quantity'] as int? ?? 1;
+          final bQty = b['quantity'] as int? ?? 1;
+          return aQty.compareTo(bQty);
+        });
+        setState(() {
+          _pricePoints = [...customPts, maxPt];
+        });
+      }
 
       // Construct final price points list (including the fixed max pack quantity row if not single quantity)
       final List<Map<String, dynamic>> finalPricePoints = [];
@@ -290,6 +333,7 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
         'requested_by': widget.uid,
         'marketLink': _marketLink,
         'shippingMethod': _shippingMethod,
+        'address': _shippingMethod == '지역배송' ? _address : null,
         'category': _category,
         'productName': _productName,
         'taxType': _taxType,
@@ -319,7 +363,40 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
 
       nav.pop(); // pop loading dialog
 
-      sm.showSnackBar(SnackBar(content: Text(tr('pe_propose_success'))));
+      showDialog(
+        context: context,
+        builder: (BuildContext ctx) {
+          return AlertDialog(
+            backgroundColor: Colors.white,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.zero,
+            ),
+            title: Text(
+              tr('pe_proposal_success_title'),
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            content: Text(tr('pe_proposal_success_desc')),
+            actions: [
+              TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  backgroundColor: Colors.black,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.zero,
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  setState(() {
+                    _proposalSubTabIndex = 0; // Redirect to 제안 목록
+                  });
+                },
+                child: Text(tr('pe_confirm')),
+              ),
+            ],
+          );
+        },
+      );
 
       // Reset form on success
       setState(() {
@@ -441,902 +518,1262 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-      child: Form(
-        key: _formKey,
+      child: Align(
+        alignment: Alignment.topLeft,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Divider(color: Colors.black, thickness: 1),
-            const SizedBox(height: 16),
-
-            // 1. 오픈마켓 판매링크(선택)
-            _buildSectionHeader(tr('pe_market_link')),
-            _buildBrutalistInput(
-              prefix: '',
-              initialValue: _marketLink,
-              hintText: 'https://smartstore.naver.com/...',
-              isOptional: true,
-              onSaved: (val) => _marketLink = val ?? '',
-            ),
-            const SizedBox(height: 20),
-
-            // 2. 배송방식
-            _buildSectionHeader(tr('pe_shipping_method')),
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.black, width: 1),
-              ),
-              child: Row(
-                children:
-                    [
-                      MapEntry('택배배송', tr('pe_parcel_delivery')),
-                      MapEntry('지역배송', tr('pe_regional_delivery')),
-                    ].map((entry) {
-                      final mValue = entry.key;
-                      final mDisplay = entry.value;
-                      final isSelected = _shippingMethod == mValue;
-                      return Expanded(
-                        child: InkWell(
-                          onTap: () => setState(() => _shippingMethod = mValue),
-                          child: Container(
-                            height: 40,
-                            color: isSelected ? Colors.black : Colors.white,
-                            alignment: Alignment.center,
-                            child: Text(
-                              mDisplay,
-                              style: TextStyle(
-                                color: isSelected ? Colors.white : Colors.black,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // 3. 카테고리 선택
-            _buildSectionHeader(tr('pe_category_select')),
-            _isLoadingCategories
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(8.0),
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.black,
-                      ),
-                    ),
-                  )
-                : _categories.isEmpty
-                    ? const Padding(
-                        padding: EdgeInsets.all(8.0),
-                        child: Text(
-                          '등록된 카테고리가 없습니다.',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      )
-                    : Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.black, width: 1),
-                        ),
-                        child: Row(
-                          children: _categories.map((cat) {
-                            final catValue = cat['name'] as String;
-                            final isSelected = _category == catValue;
-                            return Expanded(
-                              child: InkWell(
-                                onTap: () => setState(() => _category = catValue),
-                                child: Container(
-                                  height: 40,
-                                  color: isSelected ? Colors.black : Colors.white,
-                                  alignment: Alignment.center,
-                                  child: Text(
-                                    catValue,
-                                    style: TextStyle(
-                                      color: isSelected ? Colors.white : Colors.black,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-            const SizedBox(height: 20),
-
-            // 4. 상품명
-            _buildSectionHeader(tr('pe_product_name')),
-            _buildBrutalistInput(
-              prefix: '',
-              initialValue: _productName,
-              onSaved: (val) => _productName = val ?? '',
-            ),
-            const SizedBox(height: 20),
-
-            // 5. 과세 구분
-            _buildSectionHeader(tr('pe_tax_classification')),
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.black, width: 1),
-              ),
-              child: Row(
-                children:
-                    [
-                      MapEntry('과세', tr('pe_taxable')),
-                      MapEntry('면세', tr('pe_tax_exempt')),
-                    ].map((entry) {
-                      final tValue = entry.key;
-                      final tDisplay = entry.value;
-                      final isSelected = _taxType == tValue;
-                      return Expanded(
-                        child: InkWell(
-                          onTap: () => setState(() => _taxType = tValue),
-                          child: Container(
-                            height: 40,
-                            color: isSelected ? Colors.black : Colors.white,
-                            alignment: Alignment.center,
-                            child: Text(
-                              tDisplay,
-                              style: TextStyle(
-                                color: isSelected ? Colors.white : Colors.black,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // 6. 상품가격(배송비 미포함)
-            _buildSectionHeader(tr('pe_product_price_excl')),
-            _buildBrutalistInput(
-              prefix: '₩',
-              initialValue: _supplyPrice.toInt().toString(),
-              isNumberOnly: true,
-              onChanged: (val) {
-                setState(() {
-                  _supplyPrice = double.tryParse(val) ?? 0.0;
-                });
-              },
-              onSaved:
-                  (val) => _supplyPrice = double.tryParse(val ?? '') ?? 0.0,
-            ),
-            const SizedBox(height: 20),
-
-            // 7. 배송비 / 도서지역 추가 배송비 / 반품 배송비
             Row(
               children: [
-                Expanded(
-                  child: Column(
-                    children: [
-                      _buildSectionHeader(tr('pe_delivery_fee')),
-                      _buildBrutalistInput(
-                        prefix: '₩',
-                        initialValue: _deliveryPrice.toInt().toString(),
-                        isNumberOnly: true,
-                        onChanged: (val) {
-                          setState(() {
-                            _deliveryPrice = double.tryParse(val) ?? 0.0;
-                          });
-                        },
-                        onSaved:
-                            (val) =>
-                                _deliveryPrice =
-                                    double.tryParse(val ?? '') ?? 0.0,
+                InkWell(
+                  onTap: () => setState(() => _proposalSubTabIndex = 0),
+                  child: Container(
+                    height: 45,
+                    width: 90,
+
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color:
+                          _proposalSubTabIndex == 0
+                              ? Colors.black
+                              : Colors.white,
+                      border: Border.all(color: Colors.black, width: 1.5),
+                    ),
+                    child: Text(
+                      tr('pe_tab_proposal_list'),
+                      style: TextStyle(
+                        color:
+                            _proposalSubTabIndex == 0
+                                ? Colors.white
+                                : Colors.black,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
                       ),
-                    ],
+                    ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    children: [
-                      _buildSectionHeader(tr('pe_remote_island_fee')),
-                      _buildBrutalistInput(
-                        prefix: '₩',
-                        initialValue: _shippingFee.toInt().toString(),
-                        isNumberOnly: true,
-                        onSaved:
-                            (val) =>
-                                _shippingFee =
-                                    double.tryParse(val ?? '') ?? 0.0,
+                InkWell(
+                  onTap: () => setState(() => _proposalSubTabIndex = 1),
+                  child: Container(
+                    height: 45,
+                    width: 90,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color:
+                          _proposalSubTabIndex == 1
+                              ? Colors.black
+                              : Colors.white,
+                      border: Border.all(color: Colors.black, width: 1.5),
+                    ),
+                    child: Text(
+                      tr('pe_tab_proposal_form'),
+                      style: TextStyle(
+                        color:
+                            _proposalSubTabIndex == 1
+                                ? Colors.white
+                                : Colors.black,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    children: [
-                      _buildSectionHeader(tr('pe_return_delivery_fee')),
-                      _buildBrutalistInput(
-                        prefix: '₩',
-                        initialValue: _returnDeliveryPrice.toInt().toString(),
-                        isNumberOnly: true,
-                        onSaved:
-                            (val) =>
-                                _returnDeliveryPrice =
-                                    double.tryParse(val ?? '') ?? 0.0,
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 20),
-
-            // 8. ~이상 구매 시 무료배송
-            _buildSectionHeader(tr('pe_free_shipping_over')),
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.black, width: 1),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: Row(
-                      children: [
-                        const Padding(
-                          padding: EdgeInsets.only(left: 12.0),
-                          child: Text(
-                            '₩',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: TextFormField(
-                            initialValue:
-                                _freeShippingThreshold.toInt().toString(),
-                            enabled: !_noFreeShipping,
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                            ],
-                            style: const TextStyle(fontSize: 13),
-                            decoration: const InputDecoration(
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 12,
-                              ),
-                              border: InputBorder.none,
-                              isDense: true,
-                            ),
-                            onChanged: (val) {
-                              setState(() {
-                                _freeShippingThreshold =
-                                    double.tryParse(val) ?? 0.0;
-                              });
-                            },
-                            onSaved:
-                                (val) =>
-                                    _freeShippingThreshold =
-                                        double.tryParse(val ?? '') ?? 0.0,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(width: 1, height: 40, color: Colors.black),
-                  Expanded(
-                    flex: 1,
-                    child: InkWell(
-                      onTap:
-                          () => setState(
-                            () => _noFreeShipping = !_noFreeShipping,
-                          ),
-                      child: Container(
-                        height: 40,
-                        color: _noFreeShipping ? Colors.black : Colors.white,
-                        alignment: Alignment.center,
-                        child: Text(
-                          tr('pe_no_free_shipping'),
-                          style: TextStyle(
-                            color:
-                                _noFreeShipping ? Colors.white : Colors.black,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          ),
-                        ),
+            const SizedBox(height: 24),
+            if (_proposalSubTabIndex == 0)
+              ProposalListTab(uid: widget.uid)
+            else
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 1. 오픈마켓 판매링크(선택)
+                      _buildSectionHeader(tr('pe_market_link')),
+                      _buildBrutalistInput(
+                        prefix: '',
+                        initialValue: _marketLink,
+                        hintText: 'https://smartstore.naver.com/...',
+                        isOptional: true,
+                        onSaved: (val) => _marketLink = val ?? '',
                       ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
+                      const SizedBox(height: 20),
 
-            // 9. 1상자 최대 포장수량
-            _buildSectionHeader(tr('pe_max_pkg_qty')),
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.black, width: 1),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: TextFormField(
-                      initialValue: _maxPackagingQuantity.toString(),
-                      enabled: !_isSingleQuantity,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      style: const TextStyle(fontSize: 13),
-                      decoration: const InputDecoration(
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 12,
+                      // 2. 배송방식
+                      _buildSectionHeader(tr('pe_shipping_method')),
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.black, width: 1),
                         ),
-                        border: InputBorder.none,
-                        isDense: true,
-                      ),
-                      onChanged: (val) {
-                        final parsed = int.tryParse(val) ?? 50;
-                        setState(() {
-                          _maxPackagingQuantity = parsed;
-                          for (var pt in _pricePoints) {
-                            if (pt['isMax'] == true) {
-                              pt['quantity'] = parsed;
-                            }
-                          }
-                        });
-                      },
-                      onSaved: (val) {
-                        final parsed = int.tryParse(val ?? '') ?? 50;
-                        _maxPackagingQuantity = parsed;
-                        for (var pt in _pricePoints) {
-                          if (pt['isMax'] == true) {
-                            pt['quantity'] = parsed;
-                          }
-                        }
-                      },
-                    ),
-                  ),
-                  Container(width: 1, height: 40, color: Colors.black),
-                  Expanded(
-                    flex: 1,
-                    child: InkWell(
-                      onTap: () {
-                        setState(() {
-                          _isSingleQuantity = !_isSingleQuantity;
-                          if (_isSingleQuantity) {
-                            // remove everything else and make it quantity 1
-                            _pricePoints = [
-                              {'quantity': 1, 'price': 10000.0, 'isMax': true}
-                            ];
-                          } else {
-                            // make it the max quantity again
-                            _pricePoints = [
-                              {'quantity': _maxPackagingQuantity, 'price': 10000.0, 'isMax': true}
-                            ];
-                          }
-                        });
-                      },
-                      child: Container(
-                        height: 40,
-                        color: _isSingleQuantity ? Colors.black : Colors.white,
-                        alignment: Alignment.center,
-                        child: Text(
-                          tr('pe_single_qty'),
-                          style: TextStyle(
-                            color:
-                                _isSingleQuantity ? Colors.white : Colors.black,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // 10. 수량 가격 옵션
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Table(
-                  columnWidths: const {
-                    0: FlexColumnWidth(1),
-                    1: FlexColumnWidth(2),
-                  },
-                  border: TableBorder.all(color: Colors.black, width: 1),
-                  children: [
-                    TableRow(
-                      children: [
-                        Container(
-                          height: 40,
-                          alignment: Alignment.center,
-                          child: Text(
-                            tr('pe_qty_direct_input'),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          height: 40,
-                          alignment: Alignment.center,
-                          child: Text(
-                            tr('pe_product_price'),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    ...List.generate(_pricePoints.length, (index) {
-                      final pt = _pricePoints[index];
-                      final int qty = pt['quantity'] as int? ?? 1;
-                      final bool isMaxRow = pt['isMax'] == true || _isSingleQuantity;
-                      final bool isFreeShipping =
-                          !_noFreeShipping &&
-                          (qty * _supplyPrice >= _freeShippingThreshold);
-                      final double calculatedPrice =
-                          qty * _supplyPrice +
-                          (isFreeShipping ? 0.0 : _deliveryPrice);
-
-                      _pricePoints[index]['price'] = calculatedPrice;
-
-                      return TableRow(
-                        children: [
-                          TableCell(
-                            verticalAlignment:
-                                TableCellVerticalAlignment.middle,
-                            child: TextFormField(
-                              initialValue: pt['quantity'].toString(),
-                              key: ValueKey('qty_${pt['isMax']}_$qty'),
-                              textAlign: TextAlign.center,
-                              readOnly: isMaxRow,
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                              ],
-                              style: const TextStyle(fontSize: 13),
-                              decoration: const InputDecoration(
-                                border: InputBorder.none,
-                                isDense: true,
-                              ),
-                              onChanged: (val) {
-                                if (isMaxRow) return;
-                                final parsedQty = int.tryParse(val) ?? 1;
-                                setState(() {
-                                  _pricePoints[index]['quantity'] = parsedQty;
-                                });
-                              },
-                              validator: (val) {
-                                final parsedQty = int.tryParse(val ?? '') ?? 0;
-                                if (parsedQty <= 0) return '1 이상';
-                                if (!_isSingleQuantity) {
-                                  if (parsedQty >= _maxPackagingQuantity) {
-                                    return '최대 ${_maxPackagingQuantity - 1}';
-                                  }
-                                }
-                                for (int i = 0; i < _pricePoints.length; i++) {
-                                  if (i != index &&
-                                      _pricePoints[i]['quantity'] ==
-                                          parsedQty) {
-                                    return tr('pe_duplicate_qty_error');
-                                  }
-                                }
-                                return null;
-                              },
-                            ),
-                          ),
-                          TableCell(
-                            verticalAlignment:
-                                TableCellVerticalAlignment.middle,
-                            child: Row(
-                              children: [
-                                const Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 8.0,
+                        child: Row(
+                          children:
+                              [
+                                MapEntry('택배배송', tr('pe_parcel_delivery')),
+                                MapEntry('지역배송', tr('pe_regional_delivery')),
+                              ].map((entry) {
+                                final mValue = entry.key;
+                                final mDisplay = entry.value;
+                                final isSelected = _shippingMethod == mValue;
+                                return Expanded(
+                                  child: InkWell(
+                                    onTap: () {
+                                      setState(() {
+                                        _shippingMethod = mValue;
+                                        if (mValue == '택배배송') {
+                                          _address = null;
+                                        }
+                                      });
+                                      if (mValue == '지역배송' && _address == null) {
+                                        searchAddress();
+                                      }
+                                    },
+                                    child: Container(
+                                      height: 40,
+                                      color:
+                                          isSelected
+                                              ? Colors.black
+                                              : Colors.white,
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        mDisplay,
+                                        style: TextStyle(
+                                          color:
+                                              isSelected
+                                                  ? Colors.white
+                                                  : Colors.black,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ),
                                   ),
+                                );
+                              }).toList(),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      if (_shippingMethod == '지역배송') ...[
+                        _buildSectionHeader(tr('pe_delivery_region')),
+                        Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.black, width: 1),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (_address == null)
+                                Padding(
+                                  padding: const EdgeInsets.all(16.0),
                                   child: Text(
-                                    '₩',
-                                    style: TextStyle(fontSize: 13),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Text(
-                                    calculatedPrice.toInt().toString(),
+                                    tr('pe_no_regions_selected'),
                                     style: const TextStyle(
+                                      color: Colors.grey,
                                       fontSize: 13,
-                                      fontWeight: FontWeight.bold,
                                     ),
+                                  ),
+                                )
+                              else
+                                Container(
+                                  height: 48,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16.0,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.location_on, size: 16),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          _address!['address_name'] ?? '',
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                TextButton(
-                                  onPressed: isMaxRow
-                                      ? null
-                                      : () => _removePricePoint(index),
-                                  child: Text(
-                                    isMaxRow
-                                        ? (tr('pe_taxable') == '과세'
-                                            ? '(삭제 불가)'
-                                            : '(Cannot delete)')
-                                        : (tr('pe_taxable') == '과세'
-                                            ? '(삭제)'
-                                            : '(Delete)'),
-                                    style: TextStyle(
-                                      color: isMaxRow
-                                          ? Colors.grey
-                                          : Colors.black,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
+                              Container(
+                                width: double.infinity,
+                                height: 1,
+                                color: Colors.black,
+                              ),
+                              InkWell(
+                                onTap: searchAddress,
+                                child: Container(
+                                  height: 40,
+                                  color: Colors.black,
+                                  alignment: Alignment.center,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        _address == null ? Icons.add : Icons.edit,
+                                        color: Colors.white,
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        _address == null
+                                            ? tr('pe_add_region')
+                                            : tr('pe_change_region'),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+
+                      // 3. 카테고리 선택
+                      _buildSectionHeader(tr('pe_category_select')),
+                      _isLoadingCategories
+                          ? const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(8.0),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.black,
+                              ),
+                            ),
+                          )
+                          : _categories.isEmpty
+                          ? Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Text(
+                              tr('pe_no_categories'),
+                              style: const TextStyle(color: Colors.grey),
+                            ),
+                          )
+                          : Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.black, width: 1),
+                            ),
+                            child: Row(
+                              children:
+                                  _categories.map((cat) {
+                                    final catValue = cat['name'] as String;
+                                    final isSelected = _category == catValue;
+                                    return Expanded(
+                                      child: InkWell(
+                                        onTap:
+                                            () => setState(
+                                              () => _category = catValue,
+                                            ),
+                                        child: Container(
+                                          height: 40,
+                                          color:
+                                              isSelected
+                                                  ? Colors.black
+                                                  : Colors.white,
+                                          alignment: Alignment.center,
+                                          child: Text(
+                                            catValue,
+                                            style: TextStyle(
+                                              color:
+                                                  isSelected
+                                                      ? Colors.white
+                                                      : Colors.black,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                            ),
+                          ),
+                      const SizedBox(height: 20),
+
+                      // 4. 상품명
+                      _buildSectionHeader(tr('pe_product_name')),
+                      _buildBrutalistInput(
+                        prefix: '',
+                        initialValue: _productName,
+                        onSaved: (val) => _productName = val ?? '',
+                      ),
+                      const SizedBox(height: 20),
+
+                      // 5. 과세 구분
+                      _buildSectionHeader(tr('pe_tax_classification')),
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.black, width: 1),
+                        ),
+                        child: Row(
+                          children:
+                              [
+                                MapEntry('과세', tr('pe_taxable')),
+                                MapEntry('면세', tr('pe_tax_exempt')),
+                              ].map((entry) {
+                                final tValue = entry.key;
+                                final tDisplay = entry.value;
+                                final isSelected = _taxType == tValue;
+                                return Expanded(
+                                  child: InkWell(
+                                    onTap:
+                                        () => setState(() => _taxType = tValue),
+                                    child: Container(
+                                      height: 40,
+                                      color:
+                                          isSelected
+                                              ? Colors.black
+                                              : Colors.white,
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        tDisplay,
+                                        style: TextStyle(
+                                          color:
+                                              isSelected
+                                                  ? Colors.white
+                                                  : Colors.black,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                        ),
+                                      ),
                                     ),
                                   ),
+                                );
+                              }).toList(),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // 6. 상품가격(배송비 미포함)
+                      _buildSectionHeader(tr('pe_product_price_excl')),
+                      _buildBrutalistInput(
+                        prefix: '₩',
+                        initialValue: _supplyPrice.toInt().toString(),
+                        isNumberOnly: true,
+                        onChanged: (val) {
+                          setState(() {
+                            _supplyPrice = double.tryParse(val) ?? 0.0;
+                          });
+                        },
+                        onSaved:
+                            (val) =>
+                                _supplyPrice =
+                                    double.tryParse(val ?? '') ?? 0.0,
+                      ),
+                      const SizedBox(height: 20),
+
+                      // 7. 배송비 / 도서지역 추가 배송비 / 반품 배송비
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              children: [
+                                _buildSectionHeader(tr('pe_delivery_fee')),
+                                _buildBrutalistInput(
+                                  prefix: '₩',
+                                  initialValue:
+                                      _deliveryPrice.toInt().toString(),
+                                  isNumberOnly: true,
+                                  onChanged: (val) {
+                                    setState(() {
+                                      _deliveryPrice =
+                                          double.tryParse(val) ?? 0.0;
+                                    });
+                                  },
+                                  onSaved:
+                                      (val) =>
+                                          _deliveryPrice =
+                                              double.tryParse(val ?? '') ?? 0.0,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              children: [
+                                _buildSectionHeader(tr('pe_remote_island_fee')),
+                                _buildBrutalistInput(
+                                  prefix: '₩',
+                                  initialValue: _shippingFee.toInt().toString(),
+                                  isNumberOnly: true,
+                                  onSaved:
+                                      (val) =>
+                                          _shippingFee =
+                                              double.tryParse(val ?? '') ?? 0.0,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              children: [
+                                _buildSectionHeader(
+                                  tr('pe_return_delivery_fee'),
+                                ),
+                                _buildBrutalistInput(
+                                  prefix: '₩',
+                                  initialValue:
+                                      _returnDeliveryPrice.toInt().toString(),
+                                  isNumberOnly: true,
+                                  onSaved:
+                                      (val) =>
+                                          _returnDeliveryPrice =
+                                              double.tryParse(val ?? '') ?? 0.0,
                                 ),
                               ],
                             ),
                           ),
                         ],
-                      );
-                    }),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                TextButton.icon(
-                  onPressed: _addPricePoint,
-                  icon: const Icon(Icons.add, size: 16, color: Colors.black),
-                  label: Text(
-                    tr('pe_add_price_option'),
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // 11. 배송일
-            _buildSectionHeader(tr('pe_delivery_days')),
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.black, width: 1),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Row(
-                children: [
-                  Text(
-                    tr('pe_enter_number_hint'),
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                  SizedBox(
-                    width: 50,
-                    child: TextFormField(
-                      initialValue: _deliveryMinDays.toString(),
-                      textAlign: TextAlign.center,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        border: InputBorder.none,
                       ),
-                      onSaved:
-                          (val) =>
-                              _deliveryMinDays = int.tryParse(val ?? '') ?? 1,
-                    ),
-                  ),
-                  const Text(
-                    ' ~ ',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    tr('pe_enter_number_hint'),
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                  SizedBox(
-                    width: 50,
-                    child: TextFormField(
-                      initialValue: _deliveryMaxDays.toString(),
-                      textAlign: TextAlign.center,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        border: InputBorder.none,
+                      const SizedBox(height: 20),
+
+                      // 8. ~이상 구매 시 무료배송
+                      _buildSectionHeader(tr('pe_free_shipping_over')),
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.black, width: 1),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: Row(
+                                children: [
+                                  const Padding(
+                                    padding: EdgeInsets.only(left: 12.0),
+                                    child: Text(
+                                      '₩',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: TextFormField(
+                                      initialValue:
+                                          _freeShippingThreshold
+                                              .toInt()
+                                              .toString(),
+                                      enabled: !_noFreeShipping,
+                                      keyboardType: TextInputType.number,
+                                      inputFormatters: [
+                                        FilteringTextInputFormatter.digitsOnly,
+                                      ],
+                                      style: const TextStyle(fontSize: 13),
+                                      decoration: const InputDecoration(
+                                        contentPadding: EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 12,
+                                        ),
+                                        border: InputBorder.none,
+                                        isDense: true,
+                                      ),
+                                      onChanged: (val) {
+                                        setState(() {
+                                          _freeShippingThreshold =
+                                              double.tryParse(val) ?? 0.0;
+                                        });
+                                      },
+                                      onSaved:
+                                          (val) =>
+                                              _freeShippingThreshold =
+                                                  double.tryParse(val ?? '') ??
+                                                  0.0,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              width: 1,
+                              height: 40,
+                              color: Colors.black,
+                            ),
+                            Expanded(
+                              flex: 1,
+                              child: InkWell(
+                                onTap:
+                                    () => setState(
+                                      () => _noFreeShipping = !_noFreeShipping,
+                                    ),
+                                child: Container(
+                                  height: 40,
+                                  color:
+                                      _noFreeShipping
+                                          ? Colors.black
+                                          : Colors.white,
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    tr('pe_no_free_shipping'),
+                                    style: TextStyle(
+                                      color:
+                                          _noFreeShipping
+                                              ? Colors.white
+                                              : Colors.black,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      onSaved:
-                          (val) =>
-                              _deliveryMaxDays = int.tryParse(val ?? '') ?? 3,
-                    ),
-                  ),
-                  Text(
-                    tr('pe_days'),
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
+                      const SizedBox(height: 20),
 
-            // 12. 보관법 및 소비기한
-            _buildSectionHeader(tr('pe_storage_info')),
-            _buildBrutalistInput(
-              prefix: '',
-              initialValue: _storageInfo,
-              onSaved: (val) => _storageInfo = val ?? '',
-            ),
-            const SizedBox(height: 20),
+                      // 9. 1상자 최대 포장수량
+                      _buildSectionHeader(tr('pe_max_pkg_qty')),
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.black, width: 1),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: TextFormField(
+                                initialValue: _maxPackagingQuantity.toString(),
+                                enabled: !_isSingleQuantity,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
+                                style: const TextStyle(fontSize: 13),
+                                decoration: const InputDecoration(
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 12,
+                                  ),
+                                  border: InputBorder.none,
+                                  isDense: true,
+                                ),
+                                onChanged: (val) {
+                                  final parsed = int.tryParse(val) ?? 1;
+                                  setState(() {
+                                    _maxPackagingQuantity = parsed;
+                                    for (var pt in _pricePoints) {
+                                      if (pt['isMax'] == true) {
+                                        pt['quantity'] = parsed;
+                                      }
+                                    }
+                                    _pricePoints.removeWhere(
+                                      (pt) =>
+                                          pt['isMax'] != true &&
+                                          pt['quantity'] >= parsed,
+                                    );
+                                    while (_pricePoints.length > parsed &&
+                                        _pricePoints.length > 1) {
+                                      _pricePoints.removeAt(
+                                        _pricePoints.length - 2,
+                                      );
+                                    }
+                                    if (parsed <= 1) {
+                                      _pricePoints.removeWhere(
+                                        (pt) => pt['isMax'] != true,
+                                      );
+                                    }
+                                  });
+                                },
+                                validator: (val) {
+                                  final parsed = int.tryParse(val ?? '') ?? 0;
+                                  if (parsed <= 0) {
+                                    return tr('pe_val_one_or_more');
+                                  }
+                                  return null;
+                                },
+                                onSaved: (val) {
+                                  final parsed = int.tryParse(val ?? '') ?? 1;
+                                  _maxPackagingQuantity = parsed;
+                                  for (var pt in _pricePoints) {
+                                    if (pt['isMax'] == true) {
+                                      pt['quantity'] = parsed;
+                                    }
+                                  }
+                                  _pricePoints.removeWhere(
+                                    (pt) =>
+                                        pt['isMax'] != true &&
+                                        pt['quantity'] >= parsed,
+                                  );
+                                  while (_pricePoints.length > parsed &&
+                                      _pricePoints.length > 1) {
+                                    _pricePoints.removeAt(
+                                      _pricePoints.length - 2,
+                                    );
+                                  }
+                                  if (parsed <= 1) {
+                                    _pricePoints.removeWhere(
+                                      (pt) => pt['isMax'] != true,
+                                    );
+                                  }
+                                },
+                              ),
+                            ),
+                            Container(
+                              width: 1,
+                              height: 40,
+                              color: Colors.black,
+                            ),
+                            Expanded(
+                              flex: 1,
+                              child: InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    _isSingleQuantity = !_isSingleQuantity;
+                                    if (_isSingleQuantity) {
+                                      // remove everything else and make it quantity 1
+                                      _pricePoints = [
+                                        {
+                                          'quantity': 1,
+                                          'price': 10000.0,
+                                          'isMax': true,
+                                        },
+                                      ];
+                                    } else {
+                                      // make it the max quantity again
+                                      _pricePoints = [
+                                        {
+                                          'quantity': _maxPackagingQuantity,
+                                          'price': 10000.0,
+                                          'isMax': true,
+                                        },
+                                      ];
+                                    }
+                                  });
+                                },
+                                child: Container(
+                                  height: 40,
+                                  color:
+                                      _isSingleQuantity
+                                          ? Colors.black
+                                          : Colors.white,
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    tr('pe_single_qty'),
+                                    style: TextStyle(
+                                      color:
+                                          _isSingleQuantity
+                                              ? Colors.white
+                                              : Colors.black,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
 
-            // 13. 제품 안내
-            _buildSectionHeader(tr('pe_product_guide')),
-            _buildBrutalistInput(
-              prefix: '',
-              initialValue: _instructions,
-              onSaved: (val) => _instructions = val ?? '',
-            ),
-            const SizedBox(height: 20),
+                      // 10. 수량 가격 옵션
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Table(
+                            columnWidths: const {
+                              0: FlexColumnWidth(1),
+                              1: FlexColumnWidth(2),
+                            },
+                            border: TableBorder.all(
+                              color: Colors.black,
+                              width: 1,
+                            ),
+                            children: [
+                              TableRow(
+                                children: [
+                                  Container(
+                                    height: 40,
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      tr('pe_qty_direct_input'),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                  Container(
+                                    height: 40,
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      tr('pe_product_price'),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              ...List.generate(_pricePoints.length, (index) {
+                                final pt = _pricePoints[index];
+                                final int qty = pt['quantity'] as int? ?? 1;
+                                final bool isMaxRow =
+                                    pt['isMax'] == true || _isSingleQuantity;
+                                final bool isFreeShipping =
+                                    !_noFreeShipping &&
+                                    (qty * _supplyPrice >=
+                                        _freeShippingThreshold);
+                                final double calculatedPrice =
+                                    qty * _supplyPrice +
+                                    (isFreeShipping ? 0.0 : _deliveryPrice);
 
-            // 14. 이미지 업로드 슬롯
-            _buildSectionHeader(tr('pe_image_list_title')),
-            Table(
-              border: TableBorder.all(color: Colors.black, width: 1),
-              children: [
-                TableRow(
-                  children:
-                      [
-                        tr('pe_main_image'),
-                        tr('pe_add_image_1'),
-                        tr('pe_add_image_2'),
-                        tr('pe_add_image_3'),
-                        tr('pe_add_image_4'),
-                      ].map((imgHeader) {
-                        return Container(
-                          height: 36,
-                          alignment: Alignment.center,
-                          child: Text(
-                            imgHeader,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 11,
+                                _pricePoints[index]['price'] = calculatedPrice;
+
+                                return TableRow(
+                                  children: [
+                                    TableCell(
+                                      verticalAlignment:
+                                          TableCellVerticalAlignment.middle,
+                                      child: TextFormField(
+                                        initialValue: pt['quantity'].toString(),
+                                        key: ValueKey(
+                                          'qty_${pt['isMax']}_$qty',
+                                        ),
+                                        textAlign: TextAlign.center,
+                                        readOnly: isMaxRow,
+                                        keyboardType: TextInputType.number,
+                                        inputFormatters: [
+                                          FilteringTextInputFormatter
+                                              .digitsOnly,
+                                          TextInputFormatter.withFunction((
+                                            oldValue,
+                                            newValue,
+                                          ) {
+                                            if (newValue.text.isEmpty) {
+                                              return newValue;
+                                            }
+                                            final parsed = int.tryParse(
+                                              newValue.text,
+                                            );
+                                            if (parsed == null) return oldValue;
+                                            if (parsed >=
+                                                _maxPackagingQuantity) {
+                                              return oldValue;
+                                            }
+                                            return newValue;
+                                          }),
+                                        ],
+                                        style: const TextStyle(fontSize: 13),
+                                        decoration: const InputDecoration(
+                                          border: InputBorder.none,
+                                          isDense: true,
+                                        ),
+                                        onChanged: (val) {
+                                          if (isMaxRow) return;
+                                          final parsedQty =
+                                              int.tryParse(val) ?? 1;
+                                          setState(() {
+                                            _pricePoints[index]['quantity'] =
+                                                parsedQty;
+                                          });
+                                        },
+                                        validator: (val) {
+                                          if (isMaxRow) return null;
+                                          final parsedQty =
+                                              int.tryParse(val ?? '') ?? 0;
+                                          if (parsedQty <= 0)
+                                            return tr('pe_val_one_or_more');
+                                          if (!_isSingleQuantity) {
+                                            if (parsedQty >=
+                                                _maxPackagingQuantity) {
+                                              return tr(
+                                                'pe_val_max',
+                                              ).replaceAll(
+                                                '{max}',
+                                                (_maxPackagingQuantity - 1)
+                                                    .toString(),
+                                              );
+                                            }
+                                          }
+                                          for (
+                                            int i = 0;
+                                            i < _pricePoints.length;
+                                            i++
+                                          ) {
+                                            if (i != index &&
+                                                _pricePoints[i]['quantity'] ==
+                                                    parsedQty) {
+                                              return tr(
+                                                'pe_duplicate_qty_error',
+                                              );
+                                            }
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                    ),
+                                    TableCell(
+                                      verticalAlignment:
+                                          TableCellVerticalAlignment.middle,
+                                      child: Row(
+                                        children: [
+                                          const Padding(
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 8.0,
+                                            ),
+                                            child: Text(
+                                              '₩',
+                                              style: TextStyle(fontSize: 13),
+                                            ),
+                                          ),
+                                          Expanded(
+                                            child: Text(
+                                              calculatedPrice
+                                                  .toInt()
+                                                  .toString(),
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                          TextButton(
+                                            onPressed:
+                                                isMaxRow
+                                                    ? null
+                                                    : () => _removePricePoint(
+                                                      index,
+                                                    ),
+                                            child: Text(
+                                              isMaxRow
+                                                  ? tr('pe_cannot_delete')
+                                                  : tr('pe_delete_label'),
+                                              style: TextStyle(
+                                                color:
+                                                    isMaxRow
+                                                        ? Colors.grey
+                                                        : Colors.black,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              }),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          TextButton.icon(
+                            onPressed:
+                                (_isSingleQuantity ||
+                                        _maxPackagingQuantity <= 1 ||
+                                        _pricePoints.length >=
+                                            _maxPackagingQuantity)
+                                    ? null
+                                    : _addPricePoint,
+                            icon: Icon(
+                              Icons.add,
+                              size: 16,
+                              color:
+                                  (_isSingleQuantity ||
+                                          _maxPackagingQuantity <= 1 ||
+                                          _pricePoints.length >=
+                                              _maxPackagingQuantity)
+                                      ? Colors.grey
+                                      : Colors.black,
+                            ),
+                            label: Text(
+                              tr('pe_add_price_option'),
+                              style: TextStyle(
+                                color:
+                                    (_isSingleQuantity ||
+                                            _maxPackagingQuantity <= 1 ||
+                                            _pricePoints.length >=
+                                                _maxPackagingQuantity)
+                                        ? Colors.grey
+                                        : Colors.black,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
                             ),
                           ),
-                        );
-                      }).toList(),
-                ),
-                 TableRow(
-                  children: List.generate(5, (index) {
-                    final isMain = index == 0;
-                    final url =
-                        isMain
-                            ? _mainImageUrl
-                            : _additionalImageUrls[index - 1];
-                    final hasImage = url != null && url.isNotEmpty;
-                    final isUploading = _isUploadingImage[index];
+                        ],
+                      ),
+                      const SizedBox(height: 20),
 
-                    return InkWell(
-                      onTap: isUploading
-                          ? null
-                          : () {
-                              if (hasImage) {
-                                _showImageOptions(
-                                  isMain ? 0 : index - 1,
-                                  isMain,
-                                );
-                              } else {
-                                _pickAndUploadImage(
-                                  isMain ? 0 : index - 1,
-                                  isMain,
-                                );
-                              }
-                            },
-                      child: Container(
-                        height: 80,
-                        alignment: Alignment.center,
-                        child: isUploading
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.black,
+                      // 11. 배송일
+                      _buildSectionHeader(tr('pe_delivery_days')),
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.black, width: 1),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        child: Row(
+                          children: [
+                            Text(
+                              tr('pe_enter_number_hint'),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            SizedBox(
+                              width: 50,
+                              child: TextFormField(
+                                initialValue: _deliveryMinDays.toString(),
+                                textAlign: TextAlign.center,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
+                                decoration: const InputDecoration(
+                                  isDense: true,
+                                  border: InputBorder.none,
                                 ),
-                              )
-                            : hasImage
-                                ? Image.network(
-                                    url,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (c, o, s) {
-                                      return const Icon(
-                                        Icons.broken_image,
-                                        size: 24,
-                                        color: Colors.grey,
-                                      );
-                                    },
-                                  )
-                                : const Icon(
-                                    Icons.add,
-                                    size: 20,
-                                    color: Colors.black45,
-                                  ),
+                                onSaved:
+                                    (val) =>
+                                        _deliveryMinDays =
+                                            int.tryParse(val ?? '') ?? 1,
+                              ),
+                            ),
+                            const Text(
+                              ' ~ ',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              tr('pe_enter_number_hint'),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            SizedBox(
+                              width: 50,
+                              child: TextFormField(
+                                initialValue: _deliveryMaxDays.toString(),
+                                textAlign: TextAlign.center,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
+                                decoration: const InputDecoration(
+                                  isDense: true,
+                                  border: InputBorder.none,
+                                ),
+                                onSaved:
+                                    (val) =>
+                                        _deliveryMaxDays =
+                                            int.tryParse(val ?? '') ?? 3,
+                              ),
+                            ),
+                            Text(
+                              tr('pe_days'),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    );
-                  }),
+                      const SizedBox(height: 20),
+
+                      // 12. 보관법 및 소비기한
+                      _buildSectionHeader(tr('pe_storage_info')),
+                      _buildBrutalistInput(
+                        prefix: '',
+                        initialValue: _storageInfo,
+                        onSaved: (val) => _storageInfo = val ?? '',
+                      ),
+                      const SizedBox(height: 20),
+
+                      // 13. 제품 안내
+                      _buildSectionHeader(tr('pe_product_guide')),
+                      _buildBrutalistInput(
+                        prefix: '',
+                        initialValue: _instructions,
+                        onSaved: (val) => _instructions = val ?? '',
+                      ),
+                      const SizedBox(height: 20),
+
+                      // 14. 이미지 업로드 슬롯
+                      _buildSectionHeader(tr('pe_image_list_title')),
+                      Table(
+                        border: TableBorder.all(color: Colors.black, width: 1),
+                        children: [
+                          TableRow(
+                            children:
+                                [
+                                  tr('pe_main_image'),
+                                  tr('pe_add_image_1'),
+                                  tr('pe_add_image_2'),
+                                  tr('pe_add_image_3'),
+                                  tr('pe_add_image_4'),
+                                ].map((imgHeader) {
+                                  return Container(
+                                    height: 36,
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      imgHeader,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                          ),
+                          TableRow(
+                            children: List.generate(5, (index) {
+                              final isMain = index == 0;
+                              final url =
+                                  isMain
+                                      ? _mainImageUrl
+                                      : _additionalImageUrls[index - 1];
+                              final hasImage = url != null && url.isNotEmpty;
+                              final isUploading = _isUploadingImage[index];
+
+                              return InkWell(
+                                onTap:
+                                    isUploading
+                                        ? null
+                                        : () {
+                                          if (hasImage) {
+                                            _showImageOptions(
+                                              isMain ? 0 : index - 1,
+                                              isMain,
+                                            );
+                                          } else {
+                                            _pickAndUploadImage(
+                                              isMain ? 0 : index - 1,
+                                              isMain,
+                                            );
+                                          }
+                                        },
+                                child: Container(
+                                  height: 80,
+                                  alignment: Alignment.center,
+                                  child:
+                                      isUploading
+                                          ? const SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.black,
+                                            ),
+                                          )
+                                          : hasImage
+                                          ? Image.network(
+                                            url,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (c, o, s) {
+                                              return const Icon(
+                                                Icons.broken_image,
+                                                size: 24,
+                                                color: Colors.grey,
+                                              );
+                                            },
+                                          )
+                                          : const Icon(
+                                            Icons.add,
+                                            size: 20,
+                                            color: Colors.black45,
+                                          ),
+                                ),
+                              );
+                            }),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+
+                      // 15. 재고
+                      _buildSectionHeader(tr('pe_stock')),
+                      _buildBrutalistInput(
+                        prefix: '',
+                        initialValue: _stock.toString(),
+                        isNumberOnly: true,
+                        onSaved: (val) => _stock = int.tryParse(val ?? '') ?? 0,
+                      ),
+                      const SizedBox(height: 30),
+
+                      // Information guide box 1: 제품 및 서비스 입점 안내
+                      Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.black, width: 1),
+                        ),
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              tr('pe_guide_proposal_title'),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              tr('pe_guide_proposal_1'),
+                              style: const TextStyle(fontSize: 12, height: 1.4),
+                            ),
+                            Text(
+                              tr('pe_guide_proposal_2'),
+                              style: const TextStyle(fontSize: 12, height: 1.4),
+                            ),
+                            Text(
+                              tr('pe_guide_proposal_3'),
+                              style: const TextStyle(fontSize: 12, height: 1.4),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Information guide box 2: 정산일 및 결제 수수료 안내
+                      Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.black, width: 1),
+                        ),
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              tr('pe_guide_settlement_title'),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              tr('pe_guide_settlement_1'),
+                              style: const TextStyle(fontSize: 12, height: 1.4),
+                            ),
+                            Text(
+                              tr('pe_guide_settlement_2'),
+                              style: const TextStyle(fontSize: 12, height: 1.4),
+                            ),
+                            Text(
+                              tr('pe_guide_settlement_3'),
+                              style: const TextStyle(fontSize: 12, height: 1.4),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      Text(
+                        tr('pe_prob_high_title'),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                      Text(
+                        tr('pe_prob_high_1'),
+                        style: const TextStyle(fontSize: 12, height: 1.4),
+                      ),
+                      Text(
+                        tr('pe_prob_high_2'),
+                        style: const TextStyle(fontSize: 12, height: 1.4),
+                      ),
+                      Text(
+                        tr('pe_prob_high_3'),
+                        style: const TextStyle(fontSize: 12, height: 1.4),
+                      ),
+                      const SizedBox(height: 12),
+
+                      Text(
+                        tr('pe_prob_reject_title'),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                      Text(
+                        tr('pe_prob_reject_1'),
+                        style: const TextStyle(fontSize: 12, height: 1.4),
+                      ),
+                      Text(
+                        tr('pe_prob_reject_2'),
+                        style: const TextStyle(fontSize: 12, height: 1.4),
+                      ),
+                      Text(
+                        tr('pe_prob_reject_3'),
+                        style: const TextStyle(fontSize: 12, height: 1.4),
+                      ),
+                      Text(
+                        tr('pe_prob_reject_4'),
+                        style: const TextStyle(fontSize: 12, height: 1.4),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Submit proposal button
+                      Center(
+                        child: Column(
+                          children: [
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.black,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: const RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.zero,
+                                ),
+                                fixedSize: const Size(300, 60),
+                              ),
+                              onPressed: _submitProposal,
+                              child: Text(
+                                tr('pe_propose_button'),
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              tr('pe_review_desc'),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 40),
+                    ],
+                  ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // 15. 재고
-            _buildSectionHeader(tr('pe_stock')),
-            _buildBrutalistInput(
-              prefix: '',
-              initialValue: _stock.toString(),
-              isNumberOnly: true,
-              onSaved: (val) => _stock = int.tryParse(val ?? '') ?? 0,
-            ),
-            const SizedBox(height: 30),
-
-            // Information guide box 1: 제품 및 서비스 입점 안내
-            Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.black, width: 1),
               ),
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    tr('pe_guide_proposal_title'),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    tr('pe_guide_proposal_1'),
-                    style: const TextStyle(fontSize: 12, height: 1.4),
-                  ),
-                  Text(
-                    tr('pe_guide_proposal_2'),
-                    style: const TextStyle(fontSize: 12, height: 1.4),
-                  ),
-                  Text(
-                    tr('pe_guide_proposal_3'),
-                    style: const TextStyle(fontSize: 12, height: 1.4),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Information guide box 2: 정산일 및 결제 수수료 안내
-            Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.black, width: 1),
-              ),
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    tr('pe_guide_settlement_title'),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    tr('pe_guide_settlement_1'),
-                    style: const TextStyle(fontSize: 12, height: 1.4),
-                  ),
-                  Text(
-                    tr('pe_guide_settlement_2'),
-                    style: const TextStyle(fontSize: 12, height: 1.4),
-                  ),
-                  Text(
-                    tr('pe_guide_settlement_3'),
-                    style: const TextStyle(fontSize: 12, height: 1.4),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            Text(
-              tr('pe_prob_high_title'),
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-            ),
-            Text(
-              tr('pe_prob_high_1'),
-              style: const TextStyle(fontSize: 12, height: 1.4),
-            ),
-            Text(
-              tr('pe_prob_high_2'),
-              style: const TextStyle(fontSize: 12, height: 1.4),
-            ),
-            Text(
-              tr('pe_prob_high_3'),
-              style: const TextStyle(fontSize: 12, height: 1.4),
-            ),
-            const SizedBox(height: 12),
-
-            Text(
-              tr('pe_prob_reject_title'),
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-            ),
-            Text(
-              tr('pe_prob_reject_1'),
-              style: const TextStyle(fontSize: 12, height: 1.4),
-            ),
-            Text(
-              tr('pe_prob_reject_2'),
-              style: const TextStyle(fontSize: 12, height: 1.4),
-            ),
-            Text(
-              tr('pe_prob_reject_3'),
-              style: const TextStyle(fontSize: 12, height: 1.4),
-            ),
-            Text(
-              tr('pe_prob_reject_4'),
-              style: const TextStyle(fontSize: 12, height: 1.4),
-            ),
-            const SizedBox(height: 24),
-
-            // Submit proposal button
-            Center(
-              child: Column(
-                children: [
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: const RoundedRectangleBorder(
-                        borderRadius: BorderRadius.zero,
-                      ),
-                      fixedSize: const Size(300, 60),
-                    ),
-                    onPressed: _submitProposal,
-                    child: Text(
-                      tr('pe_propose_button'),
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    tr('pe_review_desc'),
-                    style: const TextStyle(fontSize: 11, color: Colors.grey),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 40),
           ],
         ),
       ),
     );
   }
+
+
 }
