@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delivery_manager_interface/core/localization.dart';
+import 'package:delivery_manager_interface/models/product_edit_request_model.dart';
 
 enum ProposalTableColumn {
   cancel,
@@ -213,27 +214,28 @@ class ProposalListTab extends StatelessWidget {
     QueryDocumentSnapshot doc,
     List<ProposalTableColumn> columns,
   ) {
-    final data = doc.data() as Map<String, dynamic>;
+    final request = ProductEditRequestModel.fromMap(
+      doc.id,
+      doc.data() as Map<String, dynamic>,
+    );
 
     String statusStr = tr('pe_status_pending');
 
-    final String shippingMethod = data['shippingMethod'] ?? '';
-    final Map<String, dynamic>? address = data['address'] as Map<String, dynamic>?;
+    final String shippingMethod = request.shippingMethod ?? '';
+    final Map<String, dynamic>? address = request.address;
     final String regionsSuffix = (shippingMethod == '지역배송' && address != null)
         ? ' (${address['address_name']?.toString().split(' ').take(2).join(' ') ?? ''})'
         : '';
-    final String category = data['category'] ?? '';
-    final String productName = data['productName'] ?? '';
-    final String taxType = data['taxType'] ?? '';
-    final int supplyPrice = (data['supplyPrice'] as num?)?.toInt() ?? 0;
-    final int deliveryPrice = (data['deliveryPrice'] as num?)?.toInt() ?? 0;
-    final int shippingFee = (data['shippingFee'] as num?)?.toInt() ?? 0;
-    final int returnDeliveryPrice =
-        (data['returnDeliveryPrice'] as num?)?.toInt() ?? 0;
+    final String category = request.category;
+    final String productName = request.productName;
+    final String taxType = request.taxType;
+    final int supplyPrice = request.supplyPrice.toInt();
+    final int deliveryPrice = request.deliveryPrice.toInt();
+    final int shippingFee = request.shippingFee.toInt();
+    final int returnDeliveryPrice = request.returnDeliveryPrice.toInt();
 
-    final bool noFreeShipping = data['noFreeShipping'] ?? false;
-    final int freeShippingThreshold =
-        (data['freeShippingThreshold'] as num?)?.toInt() ?? 0;
+    final bool noFreeShipping = request.noFreeShipping;
+    final int freeShippingThreshold = request.freeShippingThreshold.toInt();
     final String freeShippingStr =
         noFreeShipping
             ? tr('pe_no_free_shipping_label')
@@ -241,10 +243,9 @@ class ProposalListTab extends StatelessWidget {
               'pe_won_or_more',
             ).replaceAll('{amount}', freeShippingThreshold.toString());
 
-    final int maxPackagingQuantity =
-        (data['maxPackagingQuantity'] as num?)?.toInt() ?? 1;
+    final int maxPackagingQuantity = request.maxPackagingQuantity;
 
-    final ptsList = (data['pricePoints'] as List?) ?? [];
+    final ptsList = request.pricePoints;
     final String pricePointsStr = ptsList
         .map((pt) {
           final qStr = tr(
@@ -258,15 +259,15 @@ class ProposalListTab extends StatelessWidget {
         })
         .join('\n');
 
-    final int deliveryMinDays = (data['deliveryMinDays'] as num?)?.toInt() ?? 0;
-    final int deliveryMaxDays = (data['deliveryMaxDays'] as num?)?.toInt() ?? 0;
+    final int deliveryMinDays = request.deliveryMinDays;
+    final int deliveryMaxDays = request.deliveryMaxDays;
     final String deliveryDaysStr = tr('pe_days_range')
         .replaceAll('{min}', deliveryMinDays.toString())
         .replaceAll('{max}', deliveryMaxDays.toString());
 
-    final String storageInfo = data['storageInfo'] ?? '';
-    final String instructions = data['instructions'] ?? '';
-    final String imgUrl = data['imgUrl'] ?? '';
+    final String storageInfo = request.storageInfo;
+    final String instructions = request.instructions;
+    final String imgUrl = request.imgUrl;
 
     return Row(
       children:

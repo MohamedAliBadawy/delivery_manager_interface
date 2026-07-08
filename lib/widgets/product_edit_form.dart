@@ -6,15 +6,19 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:io';
 import 'package:delivery_manager_interface/core/localization.dart';
+import 'package:delivery_manager_interface/models/product_edit_request_model.dart';
+import 'package:delivery_manager_interface/models/product_model.dart';
+import 'package:delivery_manager_interface/services/kakao_service.dart';
+import 'package:delivery_manager_interface/widgets/address_search_dialog.dart';
 
 class ProductEditFormWidget extends StatefulWidget {
-  final Map<String, dynamic> productData;
+  final Product product;
   final VoidCallback onCancel;
   final VoidCallback onSuccess;
 
   const ProductEditFormWidget({
     super.key,
-    required this.productData,
+    required this.product,
     required this.onCancel,
     required this.onSuccess,
   });
@@ -55,62 +59,48 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
   List<String> _additionalImageUrls = [];
   final List<bool> _isUploadingImage = [false, false, false, false, false];
 
+  late String _shippingMethod;
+  Map<String, dynamic>? _address;
+  Map<String, dynamic>? _originalAddress;
+  bool _removeEmdLimit = false;
+
   @override
   void initState() {
     super.initState();
     _loadCategories();
-    final data = widget.productData;
+    final data = widget.product;
 
-    _category = data['category'] ?? '식품';
-    _productName = data['productName'] ?? '';
-    _taxType = data['taxType'] ?? '과세';
-    _supplyPrice = (data['supplyPrice'] ?? 0).toDouble();
-    _deliveryPrice = (data['deliveryPrice'] ?? 0).toDouble();
-    _shippingFee = (data['shippingFee'] ?? 0).toDouble();
-    _returnDeliveryPrice = (data['returnDeliveryPrice'] ?? 5000).toDouble();
-    _freeShippingThreshold =
-        (data['freeShippingThreshold'] ?? 20000).toDouble();
-    _noFreeShipping = data['noFreeShipping'] ?? false;
-    _maxPackagingQuantity = data['maxPackagingQuantity'] ?? 50;
-    _isSingleQuantity = data['isSingleQuantity'] ?? false;
+    _category = data.category;
+    _productName = data.productName;
+    _taxType = data.taxType;
+    _supplyPrice = data.supplyPrice;
+    _deliveryPrice = data.deliveryPrice ?? 0.0;
+    _shippingFee = data.shippingFee ?? 0.0;
+    _returnDeliveryPrice = data.returnDeliveryPrice;
+    _freeShippingThreshold = data.freeShippingThreshold;
+    _noFreeShipping = data.noFreeShipping;
+    _maxPackagingQuantity = data.maxPackagingQuantity;
+    _isSingleQuantity = data.isSingleQuantity;
 
     // Load price points
-    if (data['pricePoints'] != null) {
-      _pricePoints = List<Map<String, dynamic>>.from(
-        (data['pricePoints'] as List).map(
-          (item) => {
-            'quantity': item['quantity'] ?? 1,
-            'price': (item['price'] ?? 0).toDouble(),
-            'isMax': item['isMax'] ?? false,
-          },
-        ),
-      );
-      if (_pricePoints.isNotEmpty) {
-        bool foundMax = false;
-        for (var pt in _pricePoints) {
-          if (pt['isMax'] == true || pt['quantity'] == _maxPackagingQuantity) {
-            pt['isMax'] = true;
-            foundMax = true;
-            break;
-          }
+    _pricePoints = data.pricePoints.map(
+      (item) => {
+        'quantity': item.quantity,
+        'price': item.price,
+        'isMax': item.isMax ?? false,
+      },
+    ).toList();
+    if (_pricePoints.isNotEmpty) {
+      bool foundMax = false;
+      for (var pt in _pricePoints) {
+        if (pt['isMax'] == true || pt['quantity'] == _maxPackagingQuantity) {
+          pt['isMax'] = true;
+          foundMax = true;
+          break;
         }
-        if (!foundMax) {
-          _pricePoints.last['isMax'] = true;
-        }
-      } else {
-        if (_isSingleQuantity) {
-          _pricePoints = [
-            {'quantity': 1, 'price': 10000.0, 'isMax': true},
-          ];
-        } else {
-          _pricePoints = [
-            {
-              'quantity': _maxPackagingQuantity,
-              'price': 10000.0,
-              'isMax': true,
-            },
-          ];
-        }
+      }
+      if (!foundMax) {
+        _pricePoints.last['isMax'] = true;
       }
     } else {
       if (_isSingleQuantity) {
@@ -119,21 +109,63 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
         ];
       } else {
         _pricePoints = [
-          {'quantity': _maxPackagingQuantity, 'price': 10000.0, 'isMax': true},
+          {
+            'quantity': _maxPackagingQuantity,
+            'price': 10000.0,
+            'isMax': true,
+          },
         ];
       }
     }
 
-    _deliveryMinDays = data['deliveryMinDays'] ?? 1;
-    _deliveryMaxDays = data['deliveryMaxDays'] ?? 3;
-    _storageInfo = data['storageInfo'] ?? '';
-    _instructions = data['instructions'] ?? '';
-    _stock = data['stock'] ?? 0;
+    _deliveryMinDays = data.deliveryMinDays;
+    _deliveryMaxDays = data.deliveryMaxDays;
+    _storageInfo = data.storageInfo;
+    _instructions = data.instructions;
+    _stock = data.stock;
 
-    _mainImageUrl = data['imgUrl'];
-    _additionalImageUrls = List<String>.from(data['imgUrls'] ?? []);
+    _mainImageUrl = data.imgUrl;
+    _additionalImageUrls = List<String>.from(data.imgUrls.where((url) => url != null));
     while (_additionalImageUrls.length < 4) {
       _additionalImageUrls.add('');
+    }
+
+    _shippingMethod = data.shippingMethod ?? '택배배송';
+    _address = data.address != null ? Map<String, dynamic>.from(data.address!) : null;
+    _originalAddress = _address != null ? Map<String, dynamic>.from(_address!) : null;
+    if (_address != null) {
+      final name = _address!['address_name']?.toString() ?? '';
+      final parts = name.split(' ');
+      if (parts.length <= 2) {
+        _removeEmdLimit = true;
+      }
+    }
+  }
+
+  void searchAddress() async {
+    final kakaoService = KakaoApiService(
+      apiKey: '772742afea4cfac8c58ed62cfa7d1777',
+    );
+
+    final result = await showDialog(
+      context: context,
+      builder: (context) => AddressSearchDialog(kakaoService: kakaoService),
+    );
+
+    if (!mounted) return;
+
+    if (result != null && result is Map<String, dynamic>) {
+      setState(() {
+        _originalAddress = Map<String, dynamic>.from(result);
+        _address = Map<String, dynamic>.from(result);
+        if (_removeEmdLimit) {
+          final name = _address!['address_name']?.toString() ?? '';
+          final parts = name.split(' ');
+          if (parts.length > 2) {
+            _address!['address_name'] = parts.take(2).join(' ');
+          }
+        }
+      });
     }
   }
 
@@ -297,6 +329,13 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
     if (!_formKey.currentState!.validate()) return;
     _formKey.currentState!.save();
 
+    if (_shippingMethod == '지역배송' && _address == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(tr('pe_no_regions_selected'))));
+      return;
+    }
+
     // Sort price points before submitting
     if (_pricePoints.length > 1) {
       final maxPt = _pricePoints.firstWhere((pt) => pt['isMax'] == true,
@@ -335,34 +374,37 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
             ),
       );
 
-      final requestData = {
-        'product_id': widget.productData['product_id'],
-        'productName': _productName,
-        'category': _category,
-        'taxType': _taxType,
-        'supplyPrice': _supplyPrice,
-        'deliveryPrice': _deliveryPrice,
-        'shippingFee': _shippingFee,
-        'returnDeliveryPrice': _returnDeliveryPrice,
-        'freeShippingThreshold': _freeShippingThreshold,
-        'noFreeShipping': _noFreeShipping,
-        'maxPackagingQuantity': _maxPackagingQuantity,
-        'isSingleQuantity': _isSingleQuantity,
-        'pricePoints': _pricePoints,
-        'deliveryMinDays': _deliveryMinDays,
-        'deliveryMaxDays': _deliveryMaxDays,
-        'storageInfo': _storageInfo,
-        'instructions': _instructions,
-        'stock': _stock,
-        'imgUrl': _mainImageUrl,
-        'imgUrls': _additionalImageUrls.where((url) => url.isNotEmpty).toList(),
-        'requested_at': FieldValue.serverTimestamp(),
-        'status': 'pending',
-      };
+      final request = ProductEditRequestModel(
+        id: '',
+        productId: widget.product.product_id,
+        category: _category,
+        productName: _productName,
+        taxType: _taxType,
+        supplyPrice: _supplyPrice,
+        deliveryPrice: _deliveryPrice,
+        shippingFee: _shippingFee,
+        returnDeliveryPrice: _returnDeliveryPrice,
+        freeShippingThreshold: _freeShippingThreshold,
+        noFreeShipping: _noFreeShipping,
+        maxPackagingQuantity: _maxPackagingQuantity,
+        isSingleQuantity: _isSingleQuantity,
+        pricePoints: _pricePoints,
+        deliveryMinDays: _deliveryMinDays,
+        deliveryMaxDays: _deliveryMaxDays,
+        storageInfo: _storageInfo,
+        instructions: _instructions,
+        stock: _stock,
+        imgUrl: _mainImageUrl ?? '',
+        imgUrls: _additionalImageUrls.where((url) => url.isNotEmpty).toList(),
+        shippingMethod: _shippingMethod,
+        address: _shippingMethod == '지역배송' ? _address : null,
+        requestedAt: FieldValue.serverTimestamp(),
+        status: 'pending',
+      );
 
       await FirebaseFirestore.instance
           .collection('product_edit_requests')
-          .add(requestData);
+          .add(request.toMap());
 
       nav.pop(); // pop loading dialog
 
@@ -601,6 +643,191 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
                       (val) => _supplyPrice = double.tryParse(val ?? '') ?? 0.0,
                 ),
                 const SizedBox(height: 20),
+
+                // 배송방식
+                _buildSectionHeader(tr('pe_shipping_method')),
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.black, width: 1),
+                  ),
+                  child: Row(
+                    children:
+                        [
+                          MapEntry('택배배송', tr('pe_parcel_delivery')),
+                          MapEntry('지역배송', tr('pe_regional_delivery')),
+                        ].map((entry) {
+                          final mValue = entry.key;
+                          final mDisplay = entry.value;
+                          final isSelected = _shippingMethod == mValue;
+                          return Expanded(
+                            child: InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _shippingMethod = mValue;
+                                  if (mValue == '택배배송') {
+                                    _address = null;
+                                    _originalAddress = null;
+                                  }
+                                });
+                                if (mValue == '지역배송' && _address == null) {
+                                  searchAddress();
+                                }
+                              },
+                              child: Container(
+                                height: 40,
+                                color:
+                                    isSelected
+                                        ? Colors.black
+                                        : Colors.white,
+                                alignment: Alignment.center,
+                                child: Text(
+                                  mDisplay,
+                                  style: TextStyle(
+                                    color:
+                                        isSelected
+                                            ? Colors.white
+                                            : Colors.black,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                if (_shippingMethod == '지역배송') ...[
+                  _buildSectionHeader(tr('pe_delivery_region')),
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.black, width: 1),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (_address == null)
+                          Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Text(
+                              tr('pe_no_regions_selected'),
+                              style: const TextStyle(
+                                color: Colors.grey,
+                                fontSize: 13,
+                              ),
+                            ),
+                          )
+                        else ...[
+                          Container(
+                            height: 48,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16.0,
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.location_on, size: 16),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _address!['address_name'] ?? '',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.close, size: 18, color: Colors.red),
+                                  onPressed: () {
+                                    setState(() {
+                                      _address = null;
+                                      _originalAddress = null;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 12.0),
+                            child: Row(
+                              children: [
+                                SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: Checkbox(
+                                    activeColor: Colors.black,
+                                    value: _removeEmdLimit,
+                                    onChanged: (val) {
+                                      setState(() {
+                                        _removeEmdLimit = val ?? false;
+                                        if (_removeEmdLimit && _originalAddress != null) {
+                                          final name = _originalAddress!['address_name']?.toString() ?? '';
+                                          final parts = name.split(' ');
+                                          if (parts.length > 2) {
+                                            _address!['address_name'] = parts.take(2).join(' ');
+                                          }
+                                        } else if (!_removeEmdLimit && _originalAddress != null) {
+                                          _address = Map<String, dynamic>.from(_originalAddress!);
+                                        }
+                                      });
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  '읍/면/동 제한 해제 (시/군/구 단위 배송)',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        Container(
+                          width: double.infinity,
+                          height: 1,
+                          color: Colors.black,
+                        ),
+                        InkWell(
+                          onTap: searchAddress,
+                          child: Container(
+                            height: 40,
+                            color: Colors.black,
+                            alignment: Alignment.center,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  _address == null ? Icons.add : Icons.edit,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _address == null
+                                      ? tr('pe_add_region')
+                                      : tr('pe_change_region'),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
 
                 // 5. 배송비 / 도서지역 추가 배송비 / 반품 배송비
                 Row(

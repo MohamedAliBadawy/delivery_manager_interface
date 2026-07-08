@@ -5,6 +5,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:delivery_manager_interface/models/delivery_manager_model.dart';
+import 'package:delivery_manager_interface/models/user_model.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -145,33 +147,37 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final uid = credential.user!.uid;
 
-      // Save user to deliveryManagers Firestore collection
-      await _firestore.collection('deliveryManagers').doc(uid).set({
-        'uid': uid,
-        'email': email,
-        'mailOrderNumber': _mailOrderNumberController.text.trim(),
-        'repName': _repNameController.text.trim(),
-        'businessNumber': _businessNumberController.text.trim(),
-        'companyName': _companyNameController.text.trim(),
-        'businessAddress': _businessAddressController.text.trim(),
-        'emailAddress': email,
-        'name': _nameController.text.trim(),
-        'jobTitle': _jobTitleController.text.trim(),
-        'phoneNumber': _phoneNumberController.text.trim(),
-        'accountNumber': _accountNumberController.text.trim(),
-        'brandName': _brandNameController.text.trim(),
-      });
+      // Save user to deliveryManagers Firestore collection using model
+      final manager = DeliveryManagerModel(
+        uid: uid,
+        email: email,
+        mailOrderNumber: _mailOrderNumberController.text.trim(),
+        repName: _repNameController.text.trim(),
+        businessNumber: _businessNumberController.text.trim(),
+        companyName: _companyNameController.text.trim(),
+        businessAddress: _businessAddressController.text.trim(),
+        emailAddress: email,
+        name: _nameController.text.trim(),
+        jobTitle: _jobTitleController.text.trim(),
+        phoneNumber: _phoneNumberController.text.trim(),
+        accountNumber: _accountNumberController.text.trim(),
+        brandName: _brandNameController.text.trim(),
+      );
+      await _firestore.collection('deliveryManagers').doc(uid).set(manager.toMap());
 
-      // Save user to users Firestore collection to maintain consistency (for chats, etc.)
-      await _firestore.collection('users').doc(uid).set({
-        'uid': uid,
-        'email': email,
-        'name': _nameController.text.trim(),
-        'phoneNo': _phoneNumberController.text.trim(),
-        'deliveryAddress': _businessAddressController.text.trim(),
-        'deliveryAddressDetail': '',
-        'userType': 'deliveryManager',
-      });
+      // Save user to users Firestore collection to maintain consistency (for chats, etc.) using model
+      final myUser = MyUser(
+        userId: uid,
+        email: email,
+        name: _nameController.text.trim(),
+        url: 'https://i.ibb.co/mrVrHy7z/avatar.png',
+        phoneNumber: _phoneNumberController.text.trim(),
+        bio: '',
+        type: 'deliveryManager',
+        lastSeen: DateTime.now(),
+      );
+
+      await _firestore.collection('users').doc(uid).set(myUser.toDocument());
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

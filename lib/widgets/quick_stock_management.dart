@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delivery_manager_interface/core/localization.dart';
 import 'package:delivery_manager_interface/widgets/product_edit_form.dart';
+import 'package:delivery_manager_interface/models/product_model.dart';
 
 class QuickStockManagementWidget extends StatefulWidget {
   final String uid;
@@ -13,11 +14,11 @@ class QuickStockManagementWidget extends StatefulWidget {
 }
 
 class _QuickStockManagementWidgetState extends State<QuickStockManagementWidget> {
-  Map<String, dynamic>? _selectedProduct;
+  Product? _selectedProduct;
 
-  void _editStock(Map<String, dynamic> product) {
+  void _editStock(Product product) {
     final formKey = GlobalKey<FormState>();
-    int newStock = product['stock'] ?? 0;
+    int newStock = product.stock;
 
     showDialog(
       context: context,
@@ -98,7 +99,7 @@ class _QuickStockManagementWidgetState extends State<QuickStockManagementWidget>
 
                   final productRef = FirebaseFirestore.instance
                       .collection('products')
-                      .doc(product['product_id']);
+                      .doc(product.product_id);
 
                   await productRef.update({'stock': newStock});
 
@@ -163,14 +164,16 @@ class _QuickStockManagementWidgetState extends State<QuickStockManagementWidget>
                   return Text(tr('pm_no_products'));
                 }
 
-                final products = snapshot.data!.docs;
+                final products = snapshot.data!.docs
+                    .map((doc) => Product.fromMap(doc.data() as Map<String, dynamic>))
+                    .toList();
 
                 // Sync the selected product data if it changes in firestore stream
                 if (_selectedProduct != null) {
-                  Map<String, dynamic>? foundData;
-                  for (final doc in products) {
-                    if (doc.id == _selectedProduct!['product_id']) {
-                      foundData = doc.data() as Map<String, dynamic>?;
+                  Product? foundData;
+                  for (final product in products) {
+                    if (product.product_id == _selectedProduct!.product_id) {
+                      foundData = product;
                       break;
                     }
                   }
@@ -226,13 +229,12 @@ class _QuickStockManagementWidgetState extends State<QuickStockManagementWidget>
                       ],
                     ),
                     // Data Rows
-                    ...products.map((doc) {
-                      final productData = doc.data() as Map<String, dynamic>;
-                      final String productId = productData['product_id'] ?? '';
-                      final String productName = productData['productName'] ?? 'N/A';
-                      final int stock = productData['stock'] ?? 0;
+                    ...products.map((product) {
+                      final String productId = product.product_id;
+                      final String productName = product.productName;
+                      final int stock = product.stock;
                       final isSelected = _selectedProduct != null &&
-                          _selectedProduct!['product_id'] == productId;
+                          _selectedProduct!.product_id == productId;
 
                       return Row(
                         children: [
@@ -250,7 +252,7 @@ class _QuickStockManagementWidgetState extends State<QuickStockManagementWidget>
                             child: InkWell(
                               onTap: () {
                                 setState(() {
-                                  _selectedProduct = productData;
+                                  _selectedProduct = product;
                                 });
                               },
                               child: Container(
@@ -297,7 +299,7 @@ class _QuickStockManagementWidgetState extends State<QuickStockManagementWidget>
                             alignment: Alignment.centerLeft,
                             padding: const EdgeInsets.only(left: 8.0),
                             child: ElevatedButton(
-                              onPressed: () => _editStock(productData),
+                              onPressed: () => _editStock(product),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.black,
                                 foregroundColor: Colors.white,
@@ -328,7 +330,7 @@ class _QuickStockManagementWidgetState extends State<QuickStockManagementWidget>
             if (_selectedProduct != null) ...[
               const SizedBox(height: 24),
               ProductEditFormWidget(
-                productData: _selectedProduct!,
+                product: _selectedProduct!,
                 onCancel: () {
                   setState(() {
                     _selectedProduct = null;

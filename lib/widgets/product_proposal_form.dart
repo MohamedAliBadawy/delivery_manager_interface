@@ -9,6 +9,7 @@ import 'package:delivery_manager_interface/core/localization.dart';
 import 'package:delivery_manager_interface/widgets/proposal_list_tab.dart';
 import 'package:delivery_manager_interface/services/kakao_service.dart';
 import 'package:delivery_manager_interface/widgets/address_search_dialog.dart';
+import 'package:delivery_manager_interface/models/product_edit_request_model.dart';
 
 class ProductProposalForm extends StatefulWidget {
   final String uid;
@@ -42,6 +43,8 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
   ];
 
   Map<String, dynamic>? _address;
+  Map<String, dynamic>? _originalAddress;
+  bool _removeEmdLimit = false;
 
   int _deliveryMinDays = 1;
   int _deliveryMaxDays = 3;
@@ -113,7 +116,15 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
 
     if (result != null && result is Map<String, dynamic>) {
       setState(() {
-        _address = result;
+        _originalAddress = Map<String, dynamic>.from(result);
+        _address = Map<String, dynamic>.from(result);
+        if (_removeEmdLimit) {
+          final name = _address!['address_name']?.toString() ?? '';
+          final parts = name.split(' ');
+          if (parts.length > 2) {
+            _address!['address_name'] = parts.take(2).join(' ');
+          }
+        }
       });
     }
   }
@@ -326,40 +337,41 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
         });
       }
 
-      final proposalData = {
-        'product_id': '', // empty for a brand new product
-        'isNewProduct': true,
-        'sellerUid': widget.uid,
-        'requested_by': widget.uid,
-        'marketLink': _marketLink,
-        'shippingMethod': _shippingMethod,
-        'address': _shippingMethod == '지역배송' ? _address : null,
-        'category': _category,
-        'productName': _productName,
-        'taxType': _taxType,
-        'supplyPrice': _supplyPrice,
-        'deliveryPrice': _deliveryPrice,
-        'shippingFee': _shippingFee,
-        'returnDeliveryPrice': _returnDeliveryPrice,
-        'freeShippingThreshold': _freeShippingThreshold,
-        'noFreeShipping': _noFreeShipping,
-        'maxPackagingQuantity': _maxPackagingQuantity,
-        'isSingleQuantity': _isSingleQuantity,
-        'pricePoints': finalPricePoints,
-        'deliveryMinDays': _deliveryMinDays,
-        'deliveryMaxDays': _deliveryMaxDays,
-        'storageInfo': _storageInfo,
-        'instructions': _instructions,
-        'stock': _stock,
-        'imgUrl': _mainImageUrl ?? '',
-        'imgUrls': _additionalImageUrls.where((url) => url.isNotEmpty).toList(),
-        'requested_at': FieldValue.serverTimestamp(),
-        'status': 'pending',
-      };
+      final proposal = ProductEditRequestModel(
+        id: '',
+        productId: '',
+        isNewProduct: true,
+        sellerUid: widget.uid,
+        requestedBy: widget.uid,
+        marketLink: _marketLink,
+        shippingMethod: _shippingMethod,
+        address: _shippingMethod == '지역배송' ? _address : null,
+        category: _category,
+        productName: _productName,
+        taxType: _taxType,
+        supplyPrice: _supplyPrice,
+        deliveryPrice: _deliveryPrice,
+        shippingFee: _shippingFee,
+        returnDeliveryPrice: _returnDeliveryPrice,
+        freeShippingThreshold: _freeShippingThreshold,
+        noFreeShipping: _noFreeShipping,
+        maxPackagingQuantity: _maxPackagingQuantity,
+        isSingleQuantity: _isSingleQuantity,
+        pricePoints: finalPricePoints,
+        deliveryMinDays: _deliveryMinDays,
+        deliveryMaxDays: _deliveryMaxDays,
+        storageInfo: _storageInfo,
+        instructions: _instructions,
+        stock: _stock,
+        imgUrl: _mainImageUrl ?? '',
+        imgUrls: _additionalImageUrls.where((url) => url.isNotEmpty).toList(),
+        requestedAt: FieldValue.serverTimestamp(),
+        status: 'pending',
+      );
 
       await FirebaseFirestore.instance
           .collection('product_edit_requests')
-          .add(proposalData);
+          .add(proposal.toMap());
 
       nav.pop(); // pop loading dialog
 
@@ -624,6 +636,7 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
                                         _shippingMethod = mValue;
                                         if (mValue == '택배배송') {
                                           _address = null;
+                                          _originalAddress = null;
                                         }
                                       });
                                       if (mValue == '지역배송' && _address == null) {
@@ -677,7 +690,7 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
                                     ),
                                   ),
                                 )
-                              else
+                              else ...[
                                 Container(
                                   height: 48,
                                   padding: const EdgeInsets.symmetric(
@@ -696,9 +709,56 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
                                           ),
                                         ),
                                       ),
+                                      IconButton(
+                                        icon: const Icon(Icons.close, size: 18, color: Colors.red),
+                                        onPressed: () {
+                                          setState(() {
+                                            _address = null;
+                                            _originalAddress = null;
+                                          });
+                                        },
+                                      ),
                                     ],
                                   ),
                                 ),
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 12.0),
+                                  child: Row(
+                                    children: [
+                                      SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: Checkbox(
+                                          activeColor: Colors.black,
+                                          value: _removeEmdLimit,
+                                          onChanged: (val) {
+                                            setState(() {
+                                              _removeEmdLimit = val ?? false;
+                                              if (_removeEmdLimit && _originalAddress != null) {
+                                                final name = _originalAddress!['address_name']?.toString() ?? '';
+                                                final parts = name.split(' ');
+                                                if (parts.length > 2) {
+                                                  _address!['address_name'] = parts.take(2).join(' ');
+                                                }
+                                              } else if (!_removeEmdLimit && _originalAddress != null) {
+                                                _address = Map<String, dynamic>.from(_originalAddress!);
+                                              }
+                                            });
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Text(
+                                        '읍/면/동 제한 해제 (시/군/구 단위 배송)',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                               Container(
                                 width: double.infinity,
                                 height: 1,

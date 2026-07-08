@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:delivery_manager_interface/core/localization.dart';
+import 'package:delivery_manager_interface/models/delivery_manager_model.dart';
 
 Widget buildManagerInfo(String uid) {
   return ManagerInfoWidget(uid: uid);
@@ -329,17 +330,17 @@ class _ManagerInfoWidgetState extends State<ManagerInfoWidget> {
         }
 
         final doc = snapshot.data!;
-        final manager = doc.data() as Map<String, dynamic>;
+        final manager = DeliveryManagerModel.fromMap(doc.data() as Map<String, dynamic>);
         final docId = doc.id;
 
-        final brandName = manager['brandName'] ?? '';
-        final repName = manager['name'] ?? '';
-        final repContact = manager['phoneNumber'] ?? '';
-        final idEmail = manager['email'] ?? '';
-        final settlementAcc = manager['accountNumber'] ?? '';
-        final bizNumber = manager['businessNumber'] ?? '';
-        final compName = manager['companyName'] ?? '';
-        final emailAddress = manager['emailAddress'] ?? idEmail;
+        final brandName = manager.brandName;
+        final repName = manager.name;
+        final repContact = manager.phoneNumber;
+        final idEmail = manager.email;
+        final settlementAcc = manager.accountNumber;
+        final bizNumber = manager.businessNumber;
+        final compName = manager.companyName;
+        final emailAddress = manager.emailAddress.isEmpty ? idEmail : manager.emailAddress;
 
         return SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),

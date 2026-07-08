@@ -9,6 +9,7 @@ import 'package:delivery_manager_interface/models/chat_room_model.dart';
 import 'package:delivery_manager_interface/models/message_model.dart';
 import 'package:delivery_manager_interface/models/user_model.dart';
 import 'package:delivery_manager_interface/models/order_model.dart';
+import 'package:delivery_manager_interface/models/delivery_manager_model.dart';
 import 'package:delivery_manager_interface/services/chat_service.dart';
 import 'package:delivery_manager_interface/core/localization.dart';
 
@@ -61,9 +62,10 @@ class _CustomerInquiriesWidgetState extends State<CustomerInquiriesWidget> {
           .collection('deliveryManagers')
           .doc(widget.uid)
           .get();
-      if (doc.exists && mounted) {
+      if (doc.exists && doc.data() != null && mounted) {
+        final manager = DeliveryManagerModel.fromMap(doc.data()!);
         setState(() {
-          _managerName = doc.data()?['name'] ?? '';
+          _managerName = manager.name;
         });
       }
     } catch (_) {}
@@ -137,18 +139,20 @@ class _CustomerInquiriesWidgetState extends State<CustomerInquiriesWidget> {
           FirebaseFirestore.instance.collection('messages').doc();
       final messageId = messageRef.id;
 
-      await messageRef.set({
-        'id': messageId,
-        'chatRoomId': _selectedChatRoomId,
-        'senderId': widget.uid,
-        'senderName': _managerName.isNotEmpty ? _managerName : '매니저',
-        'content': content,
-        'imageUrl': imageUrl ?? '',
-        'timestamp': DateTime.now().millisecondsSinceEpoch,
-        'readBy': [widget.uid],
-        'lovedBy': [],
-        'deletedBy': [],
-      });
+      final message = MessageModel(
+        id: messageId,
+        chatRoomId: _selectedChatRoomId!,
+        senderId: widget.uid,
+        senderName: _managerName.isNotEmpty ? _managerName : '매니저',
+        content: content,
+        imageUrl: imageUrl ?? '',
+        timestamp: DateTime.now(),
+        readBy: [widget.uid],
+        lovedBy: [],
+        deletedBy: [],
+      );
+
+      await messageRef.set(message.toMap());
 
       // Update last message in chat room
       await FirebaseFirestore.instance

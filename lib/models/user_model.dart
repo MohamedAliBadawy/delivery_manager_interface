@@ -1,6 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart';
-
 class MyUser {
   String userId;
   String email;
@@ -71,6 +68,7 @@ class MyUser {
   Map<String, Object?> toDocument() {
     return {
       'userId': userId,
+      'uid': userId, // For backward compatibility with buyer app
       'email': email,
       'name': name,
       'url': url,
@@ -88,13 +86,15 @@ class MyUser {
       'followingCount': followingCount,
       'bio': bio,
       'phoneNumber': phoneNumber,
+      'phoneNo': phoneNumber, // For backward compatibility with buyer app
       'type': type,
+      'userType': type, // For backward compatibility with buyer app
     };
   }
 
   static MyUser fromDocument(Map<String, dynamic> doc) {
     return MyUser(
-      userId: (doc['userId'] ?? '') as String,
+      userId: (doc['userId'] ?? doc['uid'] ?? '') as String,
       email: (doc['email'] ?? '') as String,
       name: (doc['name'] ?? '삭제된 사용자') as String,
       url: (doc['url'] ?? '') as String,
@@ -117,14 +117,14 @@ class MyUser {
       followerCount: doc['followerCount'] ?? 0,
       followingCount: doc['followingCount'] ?? 0,
       bio: (doc['bio'] ?? '') as String?,
-      phoneNumber: (doc['phoneNumber'] ?? '') as String?,
-      type: (doc['type'] ?? 'user') as String,
+      phoneNumber: (doc['phoneNumber'] ?? doc['phoneNo'] ?? '') as String?,
+      type: (doc['type'] ?? doc['userType'] ?? 'user') as String,
     );
   }
 
   static MyUser fromSellerDocument(Map<String, dynamic> doc) {
     return MyUser(
-      userId: (doc['userId'] ?? '') as String,
+      userId: (doc['userId'] ?? doc['uid'] ?? '') as String,
       email: (doc['email'] ?? '') as String,
       name: (doc['name'] ?? '삭제된 사용자') as String,
       url: (doc['url'] ?? 'https://i.ibb.co/mrVrHy7z/avatar.png') as String,
@@ -147,8 +147,8 @@ class MyUser {
       followerCount: doc['followerCount'] ?? 0,
       followingCount: doc['followingCount'] ?? 0,
       bio: (doc['bio'] ?? '') as String?,
-      phoneNumber: (doc['phoneNumber'] ?? '') as String?,
-      type: (doc['type'] ?? 'user') as String,
+      phoneNumber: (doc['phoneNumber'] ?? doc['phoneNo'] ?? '') as String?,
+      type: (doc['type'] ?? doc['userType'] ?? 'user') as String,
     );
   }
 
