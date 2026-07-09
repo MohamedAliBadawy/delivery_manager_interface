@@ -23,10 +23,23 @@ enum ProposalTableColumn {
   photo,
 }
 
-class ProposalListTab extends StatelessWidget {
+class ProposalListTab extends StatefulWidget {
   final String uid;
 
   const ProposalListTab({super.key, required this.uid});
+
+  @override
+  State<ProposalListTab> createState() => _ProposalListTabState();
+}
+
+class _ProposalListTabState extends State<ProposalListTab> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   double _getColumnWidth(ProposalTableColumn col) {
     switch (col) {
@@ -219,13 +232,27 @@ class ProposalListTab extends StatelessWidget {
       doc.data() as Map<String, dynamic>,
     );
 
-    String statusStr = tr('pe_status_pending');
+    String statusStr;
+    switch (request.status) {
+      case 'approved':
+        statusStr = tr('pe_status_approved');
+        break;
+      case 'rejected':
+        statusStr = tr('pe_status_rejected');
+        break;
+      case 'pending':
+      default:
+        statusStr = tr('pe_status_pending');
+        break;
+    }
 
     final String shippingMethod = request.shippingMethod ?? '';
     final Map<String, dynamic>? address = request.address;
-    final String regionsSuffix = (shippingMethod == '지역배송' && address != null)
-        ? ' (${address['address_name']?.toString().split(' ').take(2).join(' ') ?? ''})'
-        : '';
+    final String addressName = address?['address_name']?.toString() ?? '';
+    final String regionsSuffix =
+        (shippingMethod == '지역배송' && addressName.isNotEmpty)
+            ? ' (${addressName.split(' ').take(2).join(' ')})'
+            : '';
     final String category = request.category;
     final String productName = request.productName;
     final String taxType = request.taxType;
@@ -301,9 +328,26 @@ class ProposalListTab extends StatelessWidget {
                 );
                 break;
               case ProposalTableColumn.status:
+                Color statusColor;
+                switch (request.status) {
+                  case 'approved':
+                    statusColor = Colors.green[700]!;
+                    break;
+                  case 'rejected':
+                    statusColor = Colors.red[700]!;
+                    break;
+                  case 'pending':
+                  default:
+                    statusColor = Colors.orange[800]!;
+                    break;
+                }
                 cellChild = Text(
                   statusStr,
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    color: statusColor,
+                  ),
                 );
                 break;
               case ProposalTableColumn.shippingMethod:
@@ -448,7 +492,7 @@ class ProposalListTab extends StatelessWidget {
       stream:
           FirebaseFirestore.instance
               .collection('product_edit_requests')
-              .where('requested_by', isEqualTo: uid)
+              .where('requested_by', isEqualTo: widget.uid)
               .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -497,20 +541,31 @@ class ProposalListTab extends StatelessWidget {
           (total, col) => total + _getColumnWidth(col),
         );
 
-        return SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: SizedBox(
-            width: totalTableWidth,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildTableHeaderRow(columns),
-                ...sortedDocs.map(
-                  (doc) => _buildTableRowItem(context, doc, columns),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Scrollbar(
+              controller: _scrollController,
+              thumbVisibility: true,
+              trackVisibility: true,
+              child: SingleChildScrollView(
+                controller: _scrollController,
+                scrollDirection: Axis.horizontal,
+                child: SizedBox(
+                  width: totalTableWidth,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildTableHeaderRow(columns),
+                      ...sortedDocs.map(
+                        (doc) => _buildTableRowItem(context, doc, columns),
+                      ),
+                    ],
+                  ),
                 ),
-              ],
+              ),
             ),
-          ),
+          ],
         );
       },
     );

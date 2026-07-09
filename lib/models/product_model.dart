@@ -57,7 +57,7 @@ class Product {
   final bool isSingleQuantity;
   final int deliveryMinDays;
   final int deliveryMaxDays;
-  final String storageInfo;
+  final String description;
   final String? shippingMethod;
   final Map<String, dynamic>? address;
 
@@ -90,7 +90,7 @@ class Product {
     this.isSingleQuantity = false,
     this.deliveryMinDays = 1,
     this.deliveryMaxDays = 3,
-    this.storageInfo = '',
+    this.description = '',
     this.shippingMethod = '택배배송',
     this.address,
   });
@@ -132,7 +132,7 @@ class Product {
       isSingleQuantity: map['isSingleQuantity'] ?? false,
       deliveryMinDays: map['deliveryMinDays'] ?? 1,
       deliveryMaxDays: map['deliveryMaxDays'] ?? 3,
-      storageInfo: map['storageInfo'] ?? '',
+      description: map['description'] ?? map['storageInfo'] ?? '',
       shippingMethod: map['shippingMethod'] as String? ?? '택배배송',
       address: map['address'] as Map<String, dynamic>?,
     );
@@ -168,7 +168,7 @@ class Product {
       'isSingleQuantity': isSingleQuantity,
       'deliveryMinDays': deliveryMinDays,
       'deliveryMaxDays': deliveryMaxDays,
-      'storageInfo': storageInfo,
+      'description': description,
       'shippingMethod': shippingMethod,
       'address': address,
     };

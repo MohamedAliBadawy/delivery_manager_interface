@@ -60,9 +60,8 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
   final List<bool> _isUploadingImage = [false, false, false, false, false];
 
   late String _shippingMethod;
-  Map<String, dynamic>? _address;
-  Map<String, dynamic>? _originalAddress;
-  bool _removeEmdLimit = false;
+  List<String> _includedSigungu = [];
+  List<String> _excludedEupmyeondong = [];
 
   @override
   void initState() {
@@ -120,7 +119,7 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
 
     _deliveryMinDays = data.deliveryMinDays;
     _deliveryMaxDays = data.deliveryMaxDays;
-    _storageInfo = data.storageInfo;
+    _storageInfo = data.description;
     _instructions = data.instructions;
     _stock = data.stock;
 
@@ -131,18 +130,30 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
     }
 
     _shippingMethod = data.shippingMethod ?? '택배배송';
-    _address = data.address != null ? Map<String, dynamic>.from(data.address!) : null;
-    _originalAddress = _address != null ? Map<String, dynamic>.from(_address!) : null;
-    if (_address != null) {
-      final name = _address!['address_name']?.toString() ?? '';
-      final parts = name.split(' ');
-      if (parts.length <= 2) {
-        _removeEmdLimit = true;
+    _includedSigungu = [];
+    _excludedEupmyeondong = [];
+    if (data.address != null) {
+      final addrMap = data.address!;
+      if (addrMap.containsKey('includedSigungu') && addrMap['includedSigungu'] is List) {
+        _includedSigungu = List<String>.from(addrMap['includedSigungu']);
+      } else {
+        final legacyName = addrMap['address_name']?.toString() ?? '';
+        if (legacyName.isNotEmpty) {
+          final parts = legacyName.split(' ');
+          if (parts.length >= 2) {
+            _includedSigungu = ['${parts[0]} ${parts[1]}'];
+          } else {
+            _includedSigungu = [legacyName];
+          }
+        }
+      }
+      if (addrMap.containsKey('excludedEupmyeondong') && addrMap['excludedEupmyeondong'] is List) {
+        _excludedEupmyeondong = List<String>.from(addrMap['excludedEupmyeondong']);
       }
     }
   }
 
-  void searchAddress() async {
+  void _addIncludedSigungu() async {
     final kakaoService = KakaoApiService(
       apiKey: '772742afea4cfac8c58ed62cfa7d1777',
     );
@@ -154,19 +165,203 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
 
     if (!mounted) return;
 
-    if (result != null && result is Map<String, dynamic>) {
-      setState(() {
-        _originalAddress = Map<String, dynamic>.from(result);
-        _address = Map<String, dynamic>.from(result);
-        if (_removeEmdLimit) {
-          final name = _address!['address_name']?.toString() ?? '';
-          final parts = name.split(' ');
-          if (parts.length > 2) {
-            _address!['address_name'] = parts.take(2).join(' ');
+    if (result != null && result is Map) {
+      String? d1;
+      String? d2;
+      if (result['address'] != null) {
+        d1 = result['address']['region_1depth_name'];
+        d2 = result['address']['region_2depth_name'];
+      }
+      if ((d1 == null || d1.isEmpty) && result['road_address'] != null) {
+        d1 = result['road_address']['region_1depth_name'];
+        d2 = result['road_address']['region_2depth_name'];
+      }
+      if (d1 == null || d1.isEmpty) {
+        final name = result['address_name']?.toString() ?? '';
+        final parts = name.split(' ');
+        if (parts.isNotEmpty) {
+          d1 = parts[0];
+          if (parts.length >= 2) {
+            d2 = parts[1];
           }
         }
-      });
+      }
+
+      if (d1 != null && d1.isNotEmpty) {
+        final newSigungu = (d2 != null && d2.isNotEmpty) ? '$d1 $d2' : d1;
+        if (!_includedSigungu.contains(newSigungu)) {
+          setState(() {
+            _includedSigungu.add(newSigungu);
+          });
+        }
+      }
     }
+  }
+
+  void _addExcludedEupmyeondong() async {
+    final kakaoService = KakaoApiService(
+      apiKey: '772742afea4cfac8c58ed62cfa7d1777',
+    );
+
+    final result = await showDialog(
+      context: context,
+      builder: (context) => AddressSearchDialog(kakaoService: kakaoService),
+    );
+
+    if (!mounted) return;
+
+    if (result != null && result is Map) {
+      String? d1;
+      String? d2;
+      String? d3;
+      if (result['address'] != null) {
+        d1 = result['address']['region_1depth_name'];
+        d2 = result['address']['region_2depth_name'];
+        d3 = result['address']['region_3depth_name'];
+      }
+      if ((d3 == null || d3.isEmpty) && result['road_address'] != null) {
+        d1 = result['road_address']['region_1depth_name'];
+        d2 = result['road_address']['region_2depth_name'];
+        d3 = result['road_address']['region_3depth_name'];
+      }
+      if (d3 == null || d3.isEmpty) {
+        final name = result['address_name']?.toString() ?? '';
+        final parts = name.split(' ');
+        if (parts.length >= 3) {
+          d1 = parts[0];
+          d2 = parts[1];
+          d3 = parts[2];
+        }
+      }
+
+      if (d3 != null && d3.isNotEmpty) {
+        final fullDong = (d1 != null && d1.isNotEmpty)
+            ? ((d2 != null && d2.isNotEmpty) ? '$d1 $d2 $d3' : '$d1 $d3')
+            : d3;
+        if (!_excludedEupmyeondong.contains(fullDong)) {
+          setState(() {
+            _excludedEupmyeondong.add(fullDong);
+          });
+        }
+      }
+    }
+  }
+
+  Widget _buildBrutalistTag({
+    required String label,
+    required VoidCallback onDelete,
+    bool isExclude = false,
+  }) {
+    final displayLabel = isExclude ? '- $label' : '+ $label';
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: Colors.black, width: 1),
+      ),
+      height: 32,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(
+              displayLabel,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
+          ),
+          InkWell(
+            onTap: onDelete,
+            child: Container(
+              width: 32,
+              height: 32,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                border: Border(
+                  left: BorderSide(color: Colors.black, width: 1),
+                ),
+                color: Colors.black,
+              ),
+              child: const Text(
+                'x',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBrutalistAddButton(VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: Colors.black,
+          border: Border.all(color: Colors.black, width: 1),
+        ),
+        alignment: Alignment.center,
+        child: const Icon(
+          Icons.add,
+          color: Colors.white,
+          size: 16,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBrutalistSection({
+    required String title,
+    required List<String> items,
+    required VoidCallback onAdd,
+    required Function(int) onDelete,
+    bool isExclude = false,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader(title),
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.black, width: 1),
+          ),
+          padding: const EdgeInsets.all(12),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                ...items.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final val = entry.value;
+                  final parts = val.split(' ');
+                  final displayName = parts.length >= 2
+                      ? '${parts[parts.length - 2]} ${parts.last}'
+                      : val;
+                  return _buildBrutalistTag(
+                    label: displayName,
+                    onDelete: () => onDelete(index),
+                    isExclude: isExclude,
+                  );
+                }).toList(),
+                _buildBrutalistAddButton(onAdd),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   Future<void> _loadCategories() async {
@@ -329,7 +524,16 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
     if (!_formKey.currentState!.validate()) return;
     _formKey.currentState!.save();
 
-    if (_shippingMethod == '지역배송' && _address == null) {
+    if (_mainImageUrl == null || _mainImageUrl!.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(tr('pe_image_required')),
+        ),
+      );
+      return;
+    }
+
+    if (_shippingMethod == '지역배송' && _includedSigungu.isEmpty) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(tr('pe_no_regions_selected'))));
@@ -397,7 +601,17 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
         imgUrl: _mainImageUrl ?? '',
         imgUrls: _additionalImageUrls.where((url) => url.isNotEmpty).toList(),
         shippingMethod: _shippingMethod,
-        address: _shippingMethod == '지역배송' ? _address : null,
+        address: _shippingMethod == '지역배송'
+            ? {
+                'address_name': _includedSigungu.isEmpty
+                    ? ''
+                    : (_includedSigungu.length == 1
+                        ? _includedSigungu.first.split(' ').last
+                        : '${_includedSigungu.first.split(' ').last} 외 ${_includedSigungu.length - 1}곳'),
+                'includedSigungu': _includedSigungu,
+                'excludedEupmyeondong': _excludedEupmyeondong,
+              }
+            : null,
         requestedAt: FieldValue.serverTimestamp(),
         status: 'pending',
       );
@@ -665,12 +879,12 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
                                 setState(() {
                                   _shippingMethod = mValue;
                                   if (mValue == '택배배송') {
-                                    _address = null;
-                                    _originalAddress = null;
+                                    _includedSigungu = [];
+                                    _excludedEupmyeondong = [];
                                   }
                                 });
-                                if (mValue == '지역배송' && _address == null) {
-                                  searchAddress();
+                                if (mValue == '지역배송' && _includedSigungu.isEmpty) {
+                                  _addIncludedSigungu();
                                 }
                               },
                               child: Container(
@@ -700,131 +914,27 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
                 const SizedBox(height: 20),
 
                 if (_shippingMethod == '지역배송') ...[
-                  _buildSectionHeader(tr('pe_delivery_region')),
-                  Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.black, width: 1),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (_address == null)
-                          Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Text(
-                              tr('pe_no_regions_selected'),
-                              style: const TextStyle(
-                                color: Colors.grey,
-                                fontSize: 13,
-                              ),
-                            ),
-                          )
-                        else ...[
-                          Container(
-                            height: 48,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16.0,
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.location_on, size: 16),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    _address!['address_name'] ?? '',
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.close, size: 18, color: Colors.red),
-                                  onPressed: () {
-                                    setState(() {
-                                      _address = null;
-                                      _originalAddress = null;
-                                    });
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 12.0),
-                            child: Row(
-                              children: [
-                                SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: Checkbox(
-                                    activeColor: Colors.black,
-                                    value: _removeEmdLimit,
-                                    onChanged: (val) {
-                                      setState(() {
-                                        _removeEmdLimit = val ?? false;
-                                        if (_removeEmdLimit && _originalAddress != null) {
-                                          final name = _originalAddress!['address_name']?.toString() ?? '';
-                                          final parts = name.split(' ');
-                                          if (parts.length > 2) {
-                                            _address!['address_name'] = parts.take(2).join(' ');
-                                          }
-                                        } else if (!_removeEmdLimit && _originalAddress != null) {
-                                          _address = Map<String, dynamic>.from(_originalAddress!);
-                                        }
-                                      });
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  '읍/면/동 제한 해제 (시/군/구 단위 배송)',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                        Container(
-                          width: double.infinity,
-                          height: 1,
-                          color: Colors.black,
-                        ),
-                        InkWell(
-                          onTap: searchAddress,
-                          child: Container(
-                            height: 40,
-                            color: Colors.black,
-                            alignment: Alignment.center,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  _address == null ? Icons.add : Icons.edit,
-                                  color: Colors.white,
-                                  size: 16,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _address == null
-                                      ? tr('pe_add_region')
-                                      : tr('pe_change_region'),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                  _buildBrutalistSection(
+                    title: '시, 군, 구 추가',
+                    items: _includedSigungu,
+                    onAdd: _addIncludedSigungu,
+                    onDelete: (index) {
+                      setState(() {
+                        _includedSigungu.removeAt(index);
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  _buildBrutalistSection(
+                    title: '읍, 면, 동 제거',
+                    items: _excludedEupmyeondong,
+                    onAdd: _addExcludedEupmyeondong,
+                    onDelete: (index) {
+                      setState(() {
+                        _excludedEupmyeondong.removeAt(index);
+                      });
+                    },
+                    isExclude: true,
                   ),
                   const SizedBox(height: 20),
                 ],

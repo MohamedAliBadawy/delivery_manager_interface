@@ -112,21 +112,49 @@ class _AddressSearchDialogState extends State<AddressSearchDialog> {
                     vertical: 12,
                   ),
                   prefixIcon: Icon(Icons.search, color: Colors.grey[600]),
-                  suffixIcon:
-                      _searchController.text.isNotEmpty
-                          ? IconButton(
-                            icon: Icon(Icons.clear, color: Colors.grey[600]),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() {
-                                _searchResults = [];
-                              });
-                            },
-                          )
-                          : null,
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_searchController.text.isNotEmpty)
+                        IconButton(
+                          icon: Icon(Icons.clear, color: Colors.grey[600]),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {
+                              _searchResults = [];
+                            });
+                          },
+                        ),
+                      IconButton(
+                        icon: Icon(Icons.search, color: Colors.grey[800]),
+                        onPressed: () {
+                          if (_searchController.text.trim().isNotEmpty) {
+                            _performSearch(_searchController.text.trim());
+                          }
+                        },
+                      ),
+                    ],
+                  ),
                 ),
                 textInputAction: TextInputAction.search,
-                onSubmitted: _performSearch,
+                onSubmitted: (val) {
+                  if (val.trim().isNotEmpty) {
+                    _performSearch(val.trim());
+                  }
+                },
+                onChanged: (val) {
+                  setState(() {});
+                  if (_debounce?.isActive ?? false) _debounce!.cancel();
+                  _debounce = Timer(const Duration(milliseconds: 500), () {
+                    if (val.trim().isNotEmpty) {
+                      _performSearch(val.trim());
+                    } else {
+                      setState(() {
+                        _searchResults = [];
+                      });
+                    }
+                  });
+                },
                 autofocus: true,
               ),
             ),

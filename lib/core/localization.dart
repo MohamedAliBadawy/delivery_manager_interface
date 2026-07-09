@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 final ValueNotifier<String> languageNotifier = ValueNotifier<String>('ko');
 
 const bool showLanguageSelector =
-    false; // Set to false to easily hide language switchers before building/deploying
+    true; // Set to false to easily hide language switchers before building/deploying
 
 String tr(String key) {
   final lang = languageNotifier.value;
@@ -634,4 +634,8 @@ const Map<String, Map<String, String>> localizedTexts = {
   'pe_val_max': {'ko': '최대 {max}', 'en': 'Max {max}'},
   'pe_cannot_delete': {'ko': '(삭제 불가)', 'en': '(Cannot delete)'},
   'pe_delete_label': {'ko': '(삭제)', 'en': '(Delete)'},
+  'pe_image_required': {
+    'ko': '메인 이미지를 등록해 주세요.',
+    'en': 'Please upload a main image.',
+  },
 };
