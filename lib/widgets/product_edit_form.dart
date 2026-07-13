@@ -82,13 +82,16 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
     _isSingleQuantity = data.isSingleQuantity;
 
     // Load price points
-    _pricePoints = data.pricePoints.map(
-      (item) => {
-        'quantity': item.quantity,
-        'price': item.price,
-        'isMax': item.isMax ?? false,
-      },
-    ).toList();
+    _pricePoints =
+        data.pricePoints
+            .map(
+              (item) => {
+                'quantity': item.quantity,
+                'price': item.price,
+                'isMax': item.isMax ?? false,
+              },
+            )
+            .toList();
     if (_pricePoints.isNotEmpty) {
       bool foundMax = false;
       for (var pt in _pricePoints) {
@@ -108,11 +111,7 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
         ];
       } else {
         _pricePoints = [
-          {
-            'quantity': _maxPackagingQuantity,
-            'price': 10000.0,
-            'isMax': true,
-          },
+          {'quantity': _maxPackagingQuantity, 'price': 10000.0, 'isMax': true},
         ];
       }
     }
@@ -124,7 +123,9 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
     _stock = data.stock;
 
     _mainImageUrl = data.imgUrl;
-    _additionalImageUrls = List<String>.from(data.imgUrls.where((url) => url != null));
+    _additionalImageUrls = List<String>.from(
+      data.imgUrls.where((url) => url != null),
+    );
     while (_additionalImageUrls.length < 4) {
       _additionalImageUrls.add('');
     }
@@ -134,7 +135,8 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
     _excludedEupmyeondong = [];
     if (data.address != null) {
       final addrMap = data.address!;
-      if (addrMap.containsKey('includedSigungu') && addrMap['includedSigungu'] is List) {
+      if (addrMap.containsKey('includedSigungu') &&
+          addrMap['includedSigungu'] is List) {
         _includedSigungu = List<String>.from(addrMap['includedSigungu']);
       } else {
         final legacyName = addrMap['address_name']?.toString() ?? '';
@@ -147,8 +149,11 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
           }
         }
       }
-      if (addrMap.containsKey('excludedEupmyeondong') && addrMap['excludedEupmyeondong'] is List) {
-        _excludedEupmyeondong = List<String>.from(addrMap['excludedEupmyeondong']);
+      if (addrMap.containsKey('excludedEupmyeondong') &&
+          addrMap['excludedEupmyeondong'] is List) {
+        _excludedEupmyeondong = List<String>.from(
+          addrMap['excludedEupmyeondong'],
+        );
       }
     }
   }
@@ -235,9 +240,10 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
       }
 
       if (d3 != null && d3.isNotEmpty) {
-        final fullDong = (d1 != null && d1.isNotEmpty)
-            ? ((d2 != null && d2.isNotEmpty) ? '$d1 $d2 $d3' : '$d1 $d3')
-            : d3;
+        final fullDong =
+            (d1 != null && d1.isNotEmpty)
+                ? ((d2 != null && d2.isNotEmpty) ? '$d1 $d2 $d3' : '$d1 $d3')
+                : d3;
         if (!_excludedEupmyeondong.contains(fullDong)) {
           setState(() {
             _excludedEupmyeondong.add(fullDong);
@@ -281,9 +287,7 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
               height: 32,
               alignment: Alignment.center,
               decoration: const BoxDecoration(
-                border: Border(
-                  left: BorderSide(color: Colors.black, width: 1),
-                ),
+                border: Border(left: BorderSide(color: Colors.black, width: 1)),
                 color: Colors.black,
               ),
               child: const Text(
@@ -312,11 +316,7 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
           border: Border.all(color: Colors.black, width: 1),
         ),
         alignment: Alignment.center,
-        child: const Icon(
-          Icons.add,
-          color: Colors.white,
-          size: 16,
-        ),
+        child: const Icon(Icons.add, color: Colors.white, size: 16),
       ),
     );
   }
@@ -346,9 +346,10 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
                   final index = entry.key;
                   final val = entry.value;
                   final parts = val.split(' ');
-                  final displayName = parts.length >= 2
-                      ? '${parts[parts.length - 2]} ${parts.last}'
-                      : val;
+                  final displayName =
+                      parts.length >= 2
+                          ? '${parts[parts.length - 2]} ${parts.last}'
+                          : val;
                   return _buildBrutalistTag(
                     label: displayName,
                     onDelete: () => onDelete(index),
@@ -382,6 +383,21 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
                 };
               }).toList();
           _isLoadingCategories = false;
+          if (_categories.isNotEmpty) {
+            final ids = _categories.map((c) => c['id'] as String).toList();
+            final names = _categories.map((c) => c['name'] as String).toList();
+            if (ids.contains(_category)) {
+              // Valid ID
+            } else if (names.contains(_category)) {
+              // Matches name, map to ID
+              final matchedCat = _categories.firstWhere(
+                (c) => c['name'] == _category,
+              );
+              _category = matchedCat['id'] as String;
+            } else {
+              _category = ids.first;
+            }
+          }
         });
       }
     } catch (e) {
@@ -525,11 +541,9 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
     _formKey.currentState!.save();
 
     if (_mainImageUrl == null || _mainImageUrl!.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(tr('pe_image_required')),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(tr('pe_image_required'))));
       return;
     }
 
@@ -542,8 +556,10 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
 
     // Sort price points before submitting
     if (_pricePoints.length > 1) {
-      final maxPt = _pricePoints.firstWhere((pt) => pt['isMax'] == true,
-          orElse: () => _pricePoints.last);
+      final maxPt = _pricePoints.firstWhere(
+        (pt) => pt['isMax'] == true,
+        orElse: () => _pricePoints.last,
+      );
       final customPts =
           _pricePoints.where((pt) => pt['isMax'] != true).toList();
       customPts.sort((a, b) {
@@ -578,9 +594,55 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
             ),
       );
 
+      String sellerName = '';
+      final managerUid =
+          (widget.product.deliveryManagerId != null &&
+                  widget.product.deliveryManagerId!.isNotEmpty)
+              ? widget.product.deliveryManagerId!
+              : widget
+                  .product
+                  .sellerName; // Fallback to sellerName if deliveryManagerId is empty
+      if (managerUid.isNotEmpty) {
+        try {
+          final doc =
+              await FirebaseFirestore.instance
+                  .collection('deliveryManagers')
+                  .doc(managerUid)
+                  .get();
+          if (doc.exists) {
+            final data = doc.data();
+            sellerName = data?['brandName'] ?? data?['name'] ?? '';
+          } else {
+            final query =
+                await FirebaseFirestore.instance
+                    .collection('deliveryManagers')
+                    .where('userId', isEqualTo: managerUid)
+                    .get();
+            if (query.docs.isNotEmpty) {
+              final data = query.docs.first.data();
+              sellerName = data['brandName'] ?? data['name'] ?? '';
+            }
+          }
+        } catch (_) {}
+      }
+      if (sellerName.isEmpty) {
+        sellerName = widget.product.sellerName;
+      }
+
       final request = ProductEditRequestModel(
         id: '',
         productId: widget.product.product_id,
+        sellerUid:
+            (widget.product.deliveryManagerId != null &&
+                    widget.product.deliveryManagerId!.isNotEmpty)
+                ? widget.product.deliveryManagerId
+                : null,
+        requestedBy:
+            (widget.product.deliveryManagerId != null &&
+                    widget.product.deliveryManagerId!.isNotEmpty)
+                ? widget.product.deliveryManagerId
+                : null,
+        sellerName: sellerName,
         category: _category,
         productName: _productName,
         taxType: _taxType,
@@ -601,17 +663,19 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
         imgUrl: _mainImageUrl ?? '',
         imgUrls: _additionalImageUrls.where((url) => url.isNotEmpty).toList(),
         shippingMethod: _shippingMethod,
-        address: _shippingMethod == '지역배송'
-            ? {
-                'address_name': _includedSigungu.isEmpty
-                    ? ''
-                    : (_includedSigungu.length == 1
-                        ? _includedSigungu.first.split(' ').last
-                        : '${_includedSigungu.first.split(' ').last} 외 ${_includedSigungu.length - 1}곳'),
-                'includedSigungu': _includedSigungu,
-                'excludedEupmyeondong': _excludedEupmyeondong,
-              }
-            : null,
+        address:
+            _shippingMethod == '지역배송'
+                ? {
+                  'address_name':
+                      _includedSigungu.isEmpty
+                          ? ''
+                          : (_includedSigungu.length == 1
+                              ? _includedSigungu.first.split(' ').last
+                              : '${_includedSigungu.first.split(' ').last} 외 ${_includedSigungu.length - 1}곳'),
+                  'includedSigungu': _includedSigungu,
+                  'excludedEupmyeondong': _excludedEupmyeondong,
+                }
+                : null,
         requestedAt: FieldValue.serverTimestamp(),
         status: 'pending',
       );
@@ -758,13 +822,13 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
                       child: Row(
                         children:
                             _categories.map((cat) {
-                              final catValue = cat['name'] as String;
-                              final isSelected = _category == catValue;
+                              final catId = cat['id'] as String;
+                              final catName = cat['name'] as String;
+                              final isSelected = _category == catId;
                               return Expanded(
                                 child: InkWell(
                                   onTap:
-                                      () =>
-                                          setState(() => _category = catValue),
+                                      () => setState(() => _category = catId),
                                   child: Container(
                                     height: 40,
                                     color:
@@ -773,7 +837,7 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
                                             : Colors.white,
                                     alignment: Alignment.center,
                                     child: Text(
-                                      catValue,
+                                      catName,
                                       style: TextStyle(
                                         color:
                                             isSelected
@@ -883,16 +947,14 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
                                     _excludedEupmyeondong = [];
                                   }
                                 });
-                                if (mValue == '지역배송' && _includedSigungu.isEmpty) {
+                                if (mValue == '지역배송' &&
+                                    _includedSigungu.isEmpty) {
                                   _addIncludedSigungu();
                                 }
                               },
                               child: Container(
                                 height: 40,
-                                color:
-                                    isSelected
-                                        ? Colors.black
-                                        : Colors.white,
+                                color: isSelected ? Colors.black : Colors.white,
                                 alignment: Alignment.center,
                                 child: Text(
                                   mDisplay,

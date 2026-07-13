@@ -34,6 +34,31 @@ class ProposalListTab extends StatefulWidget {
 
 class _ProposalListTabState extends State<ProposalListTab> {
   final ScrollController _scrollController = ScrollController();
+  Map<String, String> _categoryNames = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCategories();
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('categories')
+          .get();
+      if (mounted) {
+        setState(() {
+          _categoryNames = {
+            for (var doc in snap.docs)
+              doc.id: doc.data()['name']?.toString() ?? ''
+          };
+        });
+      }
+    } catch (e) {
+      // Ignore
+    }
+  }
 
   @override
   void dispose() {
@@ -253,7 +278,8 @@ class _ProposalListTabState extends State<ProposalListTab> {
         (shippingMethod == '지역배송' && addressName.isNotEmpty)
             ? ' (${addressName.split(' ').take(2).join(' ')})'
             : '';
-    final String category = request.category;
+    final String categoryId = request.category;
+    final String categoryDisplayName = _categoryNames[categoryId] ?? categoryId;
     final String productName = request.productName;
     final String taxType = request.taxType;
     final int supplyPrice = request.supplyPrice.toInt();
@@ -358,7 +384,7 @@ class _ProposalListTabState extends State<ProposalListTab> {
                 break;
               case ProposalTableColumn.category:
                 cellChild = Text(
-                  category,
+                  categoryDisplayName,
                   style: const TextStyle(fontSize: 12),
                 );
                 break;

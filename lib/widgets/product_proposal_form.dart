@@ -25,7 +25,7 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
 
   String _marketLink = '';
   String _shippingMethod = '택배배송';
-  String _category = '식품';
+  String _category = '';
   String _productName = '';
   String _taxType = '과세';
   double _supplyPrice = 10000.0;
@@ -85,9 +85,16 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
               }).toList();
           _isLoadingCategories = false;
           if (_categories.isNotEmpty) {
+            final ids = _categories.map((c) => c['id'] as String).toList();
             final names = _categories.map((c) => c['name'] as String).toList();
-            if (!names.contains(_category)) {
-              _category = names.first;
+            if (ids.contains(_category)) {
+              // Valid ID
+            } else if (names.contains(_category)) {
+              // Matches name, map to ID
+              final matchedCat = _categories.firstWhere((c) => c['name'] == _category);
+              _category = matchedCat['id'] as String;
+            } else {
+              _category = ids.first;
             }
           }
         });
@@ -529,12 +536,36 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
         });
       }
 
+      String sellerName = '';
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection('deliveryManagers')
+            .doc(widget.uid)
+            .get();
+        if (doc.exists) {
+          final data = doc.data();
+          sellerName = data?['brandName'] ?? data?['name'] ?? '';
+        } else {
+          final query = await FirebaseFirestore.instance
+              .collection('deliveryManagers')
+              .where('userId', isEqualTo: widget.uid)
+              .get();
+          if (query.docs.isNotEmpty) {
+            final data = query.docs.first.data();
+            sellerName = data['brandName'] ?? data['name'] ?? '';
+          }
+        }
+      } catch (e) {
+        // Fallback
+      }
+
       final proposal = ProductEditRequestModel(
         id: '',
         productId: '',
         isNewProduct: true,
         sellerUid: widget.uid,
         requestedBy: widget.uid,
+        sellerName: sellerName,
         marketLink: _marketLink,
         shippingMethod: _shippingMethod,
         address: _shippingMethod == '지역배송'
@@ -926,13 +957,14 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
                             child: Row(
                               children:
                                   _categories.map((cat) {
-                                    final catValue = cat['name'] as String;
-                                    final isSelected = _category == catValue;
+                                    final catId = cat['id'] as String;
+                                    final catName = cat['name'] as String;
+                                    final isSelected = _category == catId;
                                     return Expanded(
                                       child: InkWell(
                                         onTap:
                                             () => setState(
-                                              () => _category = catValue,
+                                              () => _category = catId,
                                             ),
                                         child: Container(
                                           height: 40,
@@ -942,7 +974,7 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
                                                   : Colors.white,
                                           alignment: Alignment.center,
                                           child: Text(
-                                            catValue,
+                                            catName,
                                             style: TextStyle(
                                               color:
                                                   isSelected

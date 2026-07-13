@@ -1,10 +1,10 @@
-
 class ProductEditRequestModel {
   final String id;
   final String productId;
   final bool? isNewProduct;
   final String? sellerUid;
   final String? requestedBy;
+  final String? sellerName;
   final String? marketLink;
   final String? shippingMethod;
   final Map<String, dynamic>? address;
@@ -36,6 +36,7 @@ class ProductEditRequestModel {
     this.isNewProduct,
     this.sellerUid,
     this.requestedBy,
+    this.sellerName,
     this.marketLink,
     this.shippingMethod,
     this.address,
@@ -69,6 +70,7 @@ class ProductEditRequestModel {
       isNewProduct: map['isNewProduct'] as bool?,
       sellerUid: map['sellerUid'] as String?,
       requestedBy: map['requested_by'] as String?,
+      sellerName: map['sellerName'] as String?,
       marketLink: map['marketLink'] as String?,
       shippingMethod: map['shippingMethod'] as String?,
       address: map['address'] as Map<String, dynamic>?,
@@ -106,6 +108,7 @@ class ProductEditRequestModel {
       if (isNewProduct != null) 'isNewProduct': isNewProduct,
       if (sellerUid != null) 'sellerUid': sellerUid,
       if (requestedBy != null) 'requested_by': requestedBy,
+      if (sellerName != null) 'sellerName': sellerName,
       if (marketLink != null) 'marketLink': marketLink,
       if (shippingMethod != null) 'shippingMethod': shippingMethod,
       'address': address,

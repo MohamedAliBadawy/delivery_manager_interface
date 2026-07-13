@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 final ValueNotifier<String> languageNotifier = ValueNotifier<String>('ko');
 
 const bool showLanguageSelector =
-    true; // Set to false to easily hide language switchers before building/deploying
+    false; // Set to false to easily hide language switchers before building/deploying
 
 String tr(String key) {
   final lang = languageNotifier.value;

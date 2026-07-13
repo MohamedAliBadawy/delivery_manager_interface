@@ -96,7 +96,15 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
         .collection('chatRooms')
         .where('participants', arrayContains: widget.uid)
         .snapshots()
-        .map((snapshot) => snapshot.docs.length);
+        .map((snapshot) {
+      return snapshot.docs.where((doc) {
+        final data = doc.data();
+        final status = data['status'] as String? ?? 'ongoing';
+        final deletedBy = data['deletedBy'] as List?;
+        final isDeleted = deletedBy != null && deletedBy.contains(widget.uid);
+        return status != 'completed' && !isDeleted;
+      }).length;
+    });
   }
 
   @override
