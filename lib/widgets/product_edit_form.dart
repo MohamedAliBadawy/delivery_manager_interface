@@ -173,18 +173,25 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
     if (result != null && result is Map) {
       String? d1;
       String? d2;
+      String? d3;
       if (result['address'] != null) {
         d1 = result['address']['region_1depth_name'];
         d2 = result['address']['region_2depth_name'];
+        d3 = result['address']['region_3depth_name'];
       }
-      if ((d1 == null || d1.isEmpty) && result['road_address'] != null) {
+      if ((d3 == null || d3.isEmpty) && result['road_address'] != null) {
         d1 = result['road_address']['region_1depth_name'];
         d2 = result['road_address']['region_2depth_name'];
+        d3 = result['road_address']['region_3depth_name'];
       }
-      if (d1 == null || d1.isEmpty) {
+      if (d3 == null || d3.isEmpty) {
         final name = result['address_name']?.toString() ?? '';
         final parts = name.split(' ');
-        if (parts.isNotEmpty) {
+        if (parts.length >= 3) {
+          d1 = parts[0];
+          d2 = parts[1];
+          d3 = parts[2];
+        } else if (parts.isNotEmpty) {
           d1 = parts[0];
           if (parts.length >= 2) {
             d2 = parts[1];
@@ -193,7 +200,9 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
       }
 
       if (d1 != null && d1.isNotEmpty) {
-        final newSigungu = (d2 != null && d2.isNotEmpty) ? '$d1 $d2' : d1;
+        final newSigungu = (d2 != null && d2.isNotEmpty)
+            ? ((d3 != null && d3.isNotEmpty) ? '$d1 $d2 $d3' : '$d1 $d2')
+            : d1;
         if (!_includedSigungu.contains(newSigungu)) {
           setState(() {
             _includedSigungu.add(newSigungu);
