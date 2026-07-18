@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delivery_manager_interface/core/localization.dart';
 import 'package:delivery_manager_interface/models/product_edit_request_model.dart';
+import 'package:delivery_manager_interface/widgets/hover_scrollbar.dart';
+
 
 enum ProposalTableColumn {
   cancel,
@@ -276,7 +278,7 @@ class _ProposalListTabState extends State<ProposalListTab> {
     final String addressName = address?['address_name']?.toString() ?? '';
     final String regionsSuffix =
         (shippingMethod == '지역배송' && addressName.isNotEmpty)
-            ? ' (${addressName.split(' ').take(2).join(' ')})'
+            ? ' ($addressName)'
             : '';
     final String categoryId = request.category;
     final String categoryDisplayName = _categoryNames[categoryId] ?? categoryId;
@@ -377,10 +379,32 @@ class _ProposalListTabState extends State<ProposalListTab> {
                 );
                 break;
               case ProposalTableColumn.shippingMethod:
-                cellChild = Text(
+                final List<String> included = address != null && address['includedSigungu'] is List
+                    ? List<String>.from(address['includedSigungu'])
+                    : [];
+                final List<String> excluded = address != null && address['excludedEupmyeondong'] is List
+                    ? List<String>.from(address['excludedEupmyeondong'])
+                    : [];
+                String tooltipText = '';
+                if (shippingMethod == '지역배송') {
+                  final includedTitle = tr('pe_delivery_region');
+                  final excludedTitle = tr('pe_taxable') == '과세' ? '제외 지역' : 'Excluded Regions';
+                  tooltipText = '$includedTitle:\n${included.isEmpty ? '-' : included.join('\n')}';
+                  if (excluded.isNotEmpty) {
+                    tooltipText += '\n\n$excludedTitle:\n${excluded.join('\n')}';
+                  }
+                }
+                final textWidget = Text(
                   '$shippingMethod$regionsSuffix',
                   style: const TextStyle(fontSize: 12),
                 );
+                cellChild = tooltipText.isNotEmpty
+                    ? Tooltip(
+                        message: tooltipText,
+                        preferBelow: false,
+                        child: textWidget,
+                      )
+                    : textWidget;
                 break;
               case ProposalTableColumn.category:
                 cellChild = Text(
@@ -570,10 +594,9 @@ class _ProposalListTabState extends State<ProposalListTab> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Scrollbar(
+            HoverScrollbar(
               controller: _scrollController,
-              thumbVisibility: true,
-              trackVisibility: true,
+              scrollDirection: Axis.horizontal,
               child: SingleChildScrollView(
                 controller: _scrollController,
                 scrollDirection: Axis.horizontal,

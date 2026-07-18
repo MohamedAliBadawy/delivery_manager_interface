@@ -10,6 +10,7 @@ import 'package:delivery_manager_interface/models/product_edit_request_model.dar
 import 'package:delivery_manager_interface/models/product_model.dart';
 import 'package:delivery_manager_interface/services/kakao_service.dart';
 import 'package:delivery_manager_interface/widgets/address_search_dialog.dart';
+import 'package:delivery_manager_interface/widgets/hover_scrollbar.dart';
 
 class ProductEditFormWidget extends StatefulWidget {
   final Product product;
@@ -62,6 +63,16 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
   late String _shippingMethod;
   List<String> _includedSigungu = [];
   List<String> _excludedEupmyeondong = [];
+
+  final ScrollController _sigunguScrollController = ScrollController();
+  final ScrollController _eupmyeondongScrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _sigunguScrollController.dispose();
+    _eupmyeondongScrollController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -200,9 +211,10 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
       }
 
       if (d1 != null && d1.isNotEmpty) {
-        final newSigungu = (d2 != null && d2.isNotEmpty)
-            ? ((d3 != null && d3.isNotEmpty) ? '$d1 $d2 $d3' : '$d1 $d2')
-            : d1;
+        final newSigungu =
+            (d2 != null && d2.isNotEmpty)
+                ? ((d3 != null && d3.isNotEmpty) ? '$d1 $d2 $d3' : '$d1 $d2')
+                : d1;
         if (!_includedSigungu.contains(newSigungu)) {
           setState(() {
             _includedSigungu.add(newSigungu);
@@ -335,6 +347,7 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
     required List<String> items,
     required VoidCallback onAdd,
     required Function(int) onDelete,
+    required ScrollController controller,
     bool isExclude = false,
   }) {
     return Column(
@@ -346,27 +359,30 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
           decoration: BoxDecoration(
             border: Border.all(color: Colors.black, width: 1),
           ),
-          padding: const EdgeInsets.all(12),
-          child: SingleChildScrollView(
+          child: HoverScrollbar(
+            controller: controller,
             scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                ...items.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final val = entry.value;
-                  final parts = val.split(' ');
-                  final displayName =
-                      parts.length >= 2
-                          ? '${parts[parts.length - 2]} ${parts.last}'
-                          : val;
-                  return _buildBrutalistTag(
-                    label: displayName,
-                    onDelete: () => onDelete(index),
-                    isExclude: isExclude,
-                  );
-                }).toList(),
-                _buildBrutalistAddButton(onAdd),
-              ],
+            child: SingleChildScrollView(
+              controller: controller,
+              scrollDirection: Axis.horizontal,
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Row(
+                  children: [
+                    ...items.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final val = entry.value;
+                      final displayName = val;
+                      return _buildBrutalistTag(
+                        label: displayName,
+                        onDelete: () => onDelete(index),
+                        isExclude: isExclude,
+                      );
+                    }).toList(),
+                    _buildBrutalistAddButton(onAdd),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -994,6 +1010,7 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
                         _includedSigungu.removeAt(index);
                       });
                     },
+                    controller: _sigunguScrollController,
                   ),
                   const SizedBox(height: 20),
                   _buildBrutalistSection(
@@ -1006,6 +1023,7 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
                       });
                     },
                     isExclude: true,
+                    controller: _eupmyeondongScrollController,
                   ),
                   const SizedBox(height: 20),
                 ],

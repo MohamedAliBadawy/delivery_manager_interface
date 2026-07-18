@@ -45,9 +45,7 @@ class MyApp extends StatelessWidget {
             ),
             focusColor: Colors.black,
             textButtonTheme: TextButtonThemeData(
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.black,
-              ),
+              style: TextButton.styleFrom(foregroundColor: Colors.black),
             ),
           ),
           home: user != null ? DeliveryManagerInterface() : const LoginScreen(),
@@ -97,14 +95,15 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
         .where('participants', arrayContains: widget.uid)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.where((doc) {
-        final data = doc.data();
-        final status = data['status'] as String? ?? 'ongoing';
-        final deletedBy = data['deletedBy'] as List?;
-        final isDeleted = deletedBy != null && deletedBy.contains(widget.uid);
-        return status != 'completed' && !isDeleted;
-      }).length;
-    });
+          return snapshot.docs.where((doc) {
+            final data = doc.data();
+            final status = data['status'] as String? ?? 'ongoing';
+            final deletedBy = data['deletedBy'] as List?;
+            final isDeleted =
+                deletedBy != null && deletedBy.contains(widget.uid);
+            return status != 'completed' && !isDeleted;
+          }).length;
+        });
   }
 
   @override
@@ -119,8 +118,10 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
     final bool needsHorizontalScroll = realWidth < targetMinWidth;
     final bool needsVerticalScroll = realHeight < targetMinHeight;
 
-    final double layoutWidth = needsHorizontalScroll ? targetMinWidth : realWidth;
-    final double layoutHeight = needsVerticalScroll ? targetMinHeight : realHeight;
+    final double layoutWidth =
+        needsHorizontalScroll ? targetMinWidth : realWidth;
+    final double layoutHeight =
+        needsVerticalScroll ? targetMinHeight : realHeight;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -139,10 +140,16 @@ class _DeliveryManagerInterfaceState extends State<DeliveryManagerInterface> {
 
             return SingleChildScrollView(
               scrollDirection: Axis.vertical,
-              physics: needsVerticalScroll ? const AlwaysScrollableScrollPhysics() : const NeverScrollableScrollPhysics(),
+              physics:
+                  needsVerticalScroll
+                      ? const AlwaysScrollableScrollPhysics()
+                      : const NeverScrollableScrollPhysics(),
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
-                physics: needsHorizontalScroll ? const AlwaysScrollableScrollPhysics() : const NeverScrollableScrollPhysics(),
+                physics:
+                    needsHorizontalScroll
+                        ? const AlwaysScrollableScrollPhysics()
+                        : const NeverScrollableScrollPhysics(),
                 child: SizedBox(
                   width: layoutWidth,
                   height: layoutHeight,

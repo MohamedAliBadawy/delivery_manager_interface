@@ -10,6 +10,7 @@ import 'package:delivery_manager_interface/widgets/proposal_list_tab.dart';
 import 'package:delivery_manager_interface/services/kakao_service.dart';
 import 'package:delivery_manager_interface/widgets/address_search_dialog.dart';
 import 'package:delivery_manager_interface/models/product_edit_request_model.dart';
+import 'package:delivery_manager_interface/widgets/hover_scrollbar.dart';
 
 class ProductProposalForm extends StatefulWidget {
   final String uid;
@@ -44,6 +45,16 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
 
   List<String> _includedSigungu = [];
   List<String> _excludedEupmyeondong = [];
+
+  final ScrollController _sigunguScrollController = ScrollController();
+  final ScrollController _eupmyeondongScrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _sigunguScrollController.dispose();
+    _eupmyeondongScrollController.dispose();
+    super.dispose();
+  }
 
   int _deliveryMinDays = 1;
   int _deliveryMaxDays = 3;
@@ -91,7 +102,9 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
               // Valid ID
             } else if (names.contains(_category)) {
               // Matches name, map to ID
-              final matchedCat = _categories.firstWhere((c) => c['name'] == _category);
+              final matchedCat = _categories.firstWhere(
+                (c) => c['name'] == _category,
+              );
               _category = matchedCat['id'] as String;
             } else {
               _category = ids.first;
@@ -150,9 +163,10 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
       }
 
       if (d1 != null && d1.isNotEmpty) {
-        final newSigungu = (d2 != null && d2.isNotEmpty)
-            ? ((d3 != null && d3.isNotEmpty) ? '$d1 $d2 $d3' : '$d1 $d2')
-            : d1;
+        final newSigungu =
+            (d2 != null && d2.isNotEmpty)
+                ? ((d3 != null && d3.isNotEmpty) ? '$d1 $d2 $d3' : '$d1 $d2')
+                : d1;
         if (!_includedSigungu.contains(newSigungu)) {
           setState(() {
             _includedSigungu.add(newSigungu);
@@ -199,9 +213,10 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
       }
 
       if (d3 != null && d3.isNotEmpty) {
-        final fullDong = (d1 != null && d1.isNotEmpty)
-            ? ((d2 != null && d2.isNotEmpty) ? '$d1 $d2 $d3' : '$d1 $d3')
-            : d3;
+        final fullDong =
+            (d1 != null && d1.isNotEmpty)
+                ? ((d2 != null && d2.isNotEmpty) ? '$d1 $d2 $d3' : '$d1 $d3')
+                : d3;
         if (!_excludedEupmyeondong.contains(fullDong)) {
           setState(() {
             _excludedEupmyeondong.add(fullDong);
@@ -245,9 +260,7 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
               height: 32,
               alignment: Alignment.center,
               decoration: const BoxDecoration(
-                border: Border(
-                  left: BorderSide(color: Colors.black, width: 1),
-                ),
+                border: Border(left: BorderSide(color: Colors.black, width: 1)),
                 color: Colors.black,
               ),
               child: const Text(
@@ -276,11 +289,7 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
           border: Border.all(color: Colors.black, width: 1),
         ),
         alignment: Alignment.center,
-        child: const Icon(
-          Icons.add,
-          color: Colors.white,
-          size: 16,
-        ),
+        child: const Icon(Icons.add, color: Colors.white, size: 16),
       ),
     );
   }
@@ -290,6 +299,7 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
     required List<String> items,
     required VoidCallback onAdd,
     required Function(int) onDelete,
+    required ScrollController controller,
     bool isExclude = false,
   }) {
     return Column(
@@ -301,26 +311,30 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
           decoration: BoxDecoration(
             border: Border.all(color: Colors.black, width: 1),
           ),
-          padding: const EdgeInsets.all(12),
-          child: SingleChildScrollView(
+          child: HoverScrollbar(
+            controller: controller,
             scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                ...items.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final val = entry.value;
-                  final parts = val.split(' ');
-                  final displayName = parts.length >= 2
-                      ? '${parts[parts.length - 2]} ${parts.last}'
-                      : val;
-                  return _buildBrutalistTag(
-                    label: displayName,
-                    onDelete: () => onDelete(index),
-                    isExclude: isExclude,
-                  );
-                }).toList(),
-                _buildBrutalistAddButton(onAdd),
-              ],
+            child: SingleChildScrollView(
+              controller: controller,
+              scrollDirection: Axis.horizontal,
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Row(
+                  children: [
+                    ...items.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final val = entry.value;
+                      final displayName = val;
+                      return _buildBrutalistTag(
+                        label: displayName,
+                        onDelete: () => onDelete(index),
+                        isExclude: isExclude,
+                      );
+                    }).toList(),
+                    _buildBrutalistAddButton(onAdd),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -463,20 +477,16 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
     _formKey.currentState!.save();
 
     if (_mainImageUrl == null || _mainImageUrl!.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(tr('pe_image_required')),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(tr('pe_image_required'))));
       return;
     }
 
     if (_shippingMethod == '지역배송' && _includedSigungu.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(tr('pe_no_regions_selected')),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(tr('pe_no_regions_selected'))));
       return;
     }
 
@@ -547,18 +557,20 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
 
       String sellerName = '';
       try {
-        final doc = await FirebaseFirestore.instance
-            .collection('deliveryManagers')
-            .doc(widget.uid)
-            .get();
+        final doc =
+            await FirebaseFirestore.instance
+                .collection('deliveryManagers')
+                .doc(widget.uid)
+                .get();
         if (doc.exists) {
           final data = doc.data();
           sellerName = data?['brandName'] ?? data?['name'] ?? '';
         } else {
-          final query = await FirebaseFirestore.instance
-              .collection('deliveryManagers')
-              .where('userId', isEqualTo: widget.uid)
-              .get();
+          final query =
+              await FirebaseFirestore.instance
+                  .collection('deliveryManagers')
+                  .where('userId', isEqualTo: widget.uid)
+                  .get();
           if (query.docs.isNotEmpty) {
             final data = query.docs.first.data();
             sellerName = data['brandName'] ?? data['name'] ?? '';
@@ -577,17 +589,19 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
         sellerName: sellerName,
         marketLink: _marketLink,
         shippingMethod: _shippingMethod,
-        address: _shippingMethod == '지역배송'
-            ? {
-                'address_name': _includedSigungu.isEmpty
-                    ? ''
-                    : (_includedSigungu.length == 1
-                        ? _includedSigungu.first.split(' ').last
-                        : '${_includedSigungu.first.split(' ').last} 외 ${_includedSigungu.length - 1}곳'),
-                'includedSigungu': _includedSigungu,
-                'excludedEupmyeondong': _excludedEupmyeondong,
-              }
-            : null,
+        address:
+            _shippingMethod == '지역배송'
+                ? {
+                  'address_name':
+                      _includedSigungu.isEmpty
+                          ? ''
+                          : (_includedSigungu.length == 1
+                              ? _includedSigungu.first.split(' ').last
+                              : '${_includedSigungu.first.split(' ').last} 외 ${_includedSigungu.length - 1}곳'),
+                  'includedSigungu': _includedSigungu,
+                  'excludedEupmyeondong': _excludedEupmyeondong,
+                }
+                : null,
         category: _category,
         productName: _productName,
         taxType: _taxType,
@@ -883,7 +897,8 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
                                           _excludedEupmyeondong = [];
                                         }
                                       });
-                                      if (mValue == '지역배송' && _includedSigungu.isEmpty) {
+                                      if (mValue == '지역배송' &&
+                                          _includedSigungu.isEmpty) {
                                         _addIncludedSigungu();
                                       }
                                     },
@@ -923,6 +938,7 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
                               _includedSigungu.removeAt(index);
                             });
                           },
+                          controller: _sigunguScrollController,
                         ),
                         const SizedBox(height: 20),
                         _buildBrutalistSection(
@@ -935,6 +951,7 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
                             });
                           },
                           isExclude: true,
+                          controller: _eupmyeondongScrollController,
                         ),
                         const SizedBox(height: 20),
                       ],
@@ -1975,6 +1992,4 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
       ),
     );
   }
-
-
 }

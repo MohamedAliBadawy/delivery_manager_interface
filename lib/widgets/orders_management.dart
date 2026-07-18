@@ -20,6 +20,8 @@ import 'package:delivery_manager_interface/widgets/manager_info.dart';
 import 'package:delivery_manager_interface/widgets/customer_inquiries.dart';
 import 'package:delivery_manager_interface/widgets/quick_stock_management.dart';
 import 'package:delivery_manager_interface/widgets/product_proposal_form.dart';
+import 'package:delivery_manager_interface/widgets/hover_scrollbar.dart';
+
 
 enum OrderTableColumn {
   checkbox,
@@ -2164,16 +2166,20 @@ class _OrdersManagementWidgetState extends State<OrdersManagementWidget> {
         ),
         // Body
         Expanded(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
+          child: HoverScrollbar(
             controller: _bodyScrollController,
-            child: SizedBox(
-              width: totalTableWidth,
-              child: ListView.builder(
-                itemCount: visibleOrders.length,
-                itemBuilder: (context, index) {
-                  return _buildOrderRowItem(visibleOrders[index], columns);
-                },
+            scrollDirection: Axis.horizontal,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              controller: _bodyScrollController,
+              child: SizedBox(
+                width: totalTableWidth,
+                child: ListView.builder(
+                  itemCount: visibleOrders.length,
+                  itemBuilder: (context, index) {
+                    return _buildOrderRowItem(visibleOrders[index], columns);
+                  },
+                ),
               ),
             ),
           ),
