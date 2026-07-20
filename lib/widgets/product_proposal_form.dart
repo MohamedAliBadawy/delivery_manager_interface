@@ -29,18 +29,19 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
   String _category = '';
   String _productName = '';
   String _taxType = '과세';
-  double _supplyPrice = 10000.0;
-  double _deliveryPrice = 4000.0;
-  double _shippingFee = 5000.0; // remote area delivery fee
-  double _returnDeliveryPrice = 5000.0;
-  double _freeShippingThreshold = 20000.0;
+  double? _supplyPrice;
+  double? _deliveryPrice;
+  double? _shippingFee; // remote area delivery fee
+  double? _returnDeliveryPrice;
+  double? _freeShippingThreshold;
   bool _noFreeShipping = false;
   int _maxPackagingQuantity = 1;
   bool _isSingleQuantity = false;
+  int _resetCounter = 0;
 
   // Dynamic list of price options (Custom quantities)
   List<Map<String, dynamic>> _pricePoints = [
-    {'quantity': 1, 'price': 14000.0, 'isMax': true},
+    {'quantity': 1, 'price': 0.0, 'isMax': true},
   ];
 
   List<String> _includedSigungu = [];
@@ -56,8 +57,8 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
     super.dispose();
   }
 
-  int _deliveryMinDays = 1;
-  int _deliveryMaxDays = 3;
+  int? _deliveryMinDays;
+  int? _deliveryMaxDays;
   String _storageInfo = '';
   String _instructions = '';
   int _stock = 0;
@@ -545,10 +546,11 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
           )) {
         final bool isFreeShipping =
             !_noFreeShipping &&
-            (_maxPackagingQuantity * _supplyPrice >= _freeShippingThreshold);
+            (_maxPackagingQuantity * (_supplyPrice ?? 0.0) >=
+                (_freeShippingThreshold ?? 0.0));
         final double maxQtyPrice =
-            _maxPackagingQuantity * _supplyPrice +
-            (isFreeShipping ? 0.0 : _deliveryPrice);
+            _maxPackagingQuantity * (_supplyPrice ?? 0.0) +
+            (isFreeShipping ? 0.0 : (_deliveryPrice ?? 0.0));
         finalPricePoints.add({
           'quantity': _maxPackagingQuantity,
           'price': maxQtyPrice,
@@ -605,17 +607,17 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
         category: _category,
         productName: _productName,
         taxType: _taxType,
-        supplyPrice: _supplyPrice,
-        deliveryPrice: _deliveryPrice,
-        shippingFee: _shippingFee,
-        returnDeliveryPrice: _returnDeliveryPrice,
-        freeShippingThreshold: _freeShippingThreshold,
+        supplyPrice: _supplyPrice ?? 0.0,
+        deliveryPrice: _deliveryPrice ?? 0.0,
+        shippingFee: _shippingFee ?? 0.0,
+        returnDeliveryPrice: _returnDeliveryPrice ?? 0.0,
+        freeShippingThreshold: _freeShippingThreshold ?? 0.0,
         noFreeShipping: _noFreeShipping,
         maxPackagingQuantity: _maxPackagingQuantity,
         isSingleQuantity: _isSingleQuantity,
         pricePoints: finalPricePoints,
-        deliveryMinDays: _deliveryMinDays,
-        deliveryMaxDays: _deliveryMaxDays,
+        deliveryMinDays: _deliveryMinDays ?? 1,
+        deliveryMaxDays: _deliveryMaxDays ?? 3,
         storageInfo: _storageInfo,
         instructions: _instructions,
         stock: _stock,
@@ -677,13 +679,21 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
         _additionalImageUrls = ['', '', '', ''];
         _includedSigungu = [];
         _excludedEupmyeondong = [];
+        _supplyPrice = null;
+        _deliveryPrice = null;
+        _shippingFee = null;
+        _returnDeliveryPrice = null;
+        _freeShippingThreshold = null;
+        _maxPackagingQuantity = 1;
+        _isSingleQuantity = false;
+        _deliveryMinDays = null;
+        _deliveryMaxDays = null;
         _pricePoints = [
-          {'quantity': 1, 'price': 14000.0},
-          {'quantity': 2, 'price': 24000.0},
-          {'quantity': 3, 'price': 34000.0},
-          {'quantity': 4, 'price': 44000.0},
+          {'quantity': 1, 'price': 0.0, 'isMax': true},
         ];
+        _resetCounter++;
       });
+      _formKey.currentState?.reset();
     } catch (e) {
       try {
         nav.pop();
@@ -749,7 +759,6 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
           Expanded(
             child: TextFormField(
               initialValue: initialValue,
-              key: initialValue.isEmpty ? null : ValueKey(initialValue),
               readOnly: readOnly,
               keyboardType:
                   isNumberOnly ? TextInputType.number : TextInputType.text,
@@ -859,6 +868,7 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
                 child: Form(
                   key: _formKey,
                   child: Column(
+                    key: ValueKey('proposal_fields_$_resetCounter'),
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // 1. 오픈마켓 판매링크(선택)
@@ -1076,17 +1086,17 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
                       _buildSectionHeader(tr('pe_product_price_excl')),
                       _buildBrutalistInput(
                         prefix: '₩',
-                        initialValue: _supplyPrice.toInt().toString(),
+                        initialValue: _supplyPrice?.toInt().toString() ?? '',
                         isNumberOnly: true,
                         onChanged: (val) {
                           setState(() {
-                            _supplyPrice = double.tryParse(val) ?? 0.0;
+                            _supplyPrice = double.tryParse(val);
                           });
                         },
                         onSaved:
                             (val) =>
                                 _supplyPrice =
-                                    double.tryParse(val ?? '') ?? 0.0,
+                                    double.tryParse(val ?? ''),
                       ),
                       const SizedBox(height: 20),
 
@@ -1100,18 +1110,17 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
                                 _buildBrutalistInput(
                                   prefix: '₩',
                                   initialValue:
-                                      _deliveryPrice.toInt().toString(),
+                                      _deliveryPrice?.toInt().toString() ?? '',
                                   isNumberOnly: true,
                                   onChanged: (val) {
                                     setState(() {
-                                      _deliveryPrice =
-                                          double.tryParse(val) ?? 0.0;
+                                      _deliveryPrice = double.tryParse(val);
                                     });
                                   },
                                   onSaved:
                                       (val) =>
                                           _deliveryPrice =
-                                              double.tryParse(val ?? '') ?? 0.0,
+                                              double.tryParse(val ?? ''),
                                 ),
                               ],
                             ),
@@ -1123,12 +1132,13 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
                                 _buildSectionHeader(tr('pe_remote_island_fee')),
                                 _buildBrutalistInput(
                                   prefix: '₩',
-                                  initialValue: _shippingFee.toInt().toString(),
+                                  initialValue:
+                                      _shippingFee?.toInt().toString() ?? '',
                                   isNumberOnly: true,
                                   onSaved:
                                       (val) =>
                                           _shippingFee =
-                                              double.tryParse(val ?? '') ?? 0.0,
+                                              double.tryParse(val ?? ''),
                                 ),
                               ],
                             ),
@@ -1143,12 +1153,13 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
                                 _buildBrutalistInput(
                                   prefix: '₩',
                                   initialValue:
-                                      _returnDeliveryPrice.toInt().toString(),
+                                      _returnDeliveryPrice?.toInt().toString() ??
+                                      '',
                                   isNumberOnly: true,
                                   onSaved:
                                       (val) =>
                                           _returnDeliveryPrice =
-                                              double.tryParse(val ?? '') ?? 0.0,
+                                              double.tryParse(val ?? ''),
                                 ),
                               ],
                             ),
@@ -1182,9 +1193,8 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
                                   Expanded(
                                     child: TextFormField(
                                       initialValue:
-                                          _freeShippingThreshold
-                                              .toInt()
-                                              .toString(),
+                                          _freeShippingThreshold?.toInt().toString() ??
+                                          '',
                                       enabled: !_noFreeShipping,
                                       keyboardType: TextInputType.number,
                                       inputFormatters: [
@@ -1202,14 +1212,13 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
                                       onChanged: (val) {
                                         setState(() {
                                           _freeShippingThreshold =
-                                              double.tryParse(val) ?? 0.0;
+                                              double.tryParse(val);
                                         });
                                       },
                                       onSaved:
                                           (val) =>
                                               _freeShippingThreshold =
-                                                  double.tryParse(val ?? '') ??
-                                                  0.0,
+                                                  double.tryParse(val ?? ''),
                                     ),
                                   ),
                                 ],
@@ -1445,11 +1454,11 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
                                     pt['isMax'] == true || _isSingleQuantity;
                                 final bool isFreeShipping =
                                     !_noFreeShipping &&
-                                    (qty * _supplyPrice >=
-                                        _freeShippingThreshold);
+                                    (qty * (_supplyPrice ?? 0.0) >=
+                                        (_freeShippingThreshold ?? 0.0));
                                 final double calculatedPrice =
-                                    qty * _supplyPrice +
-                                    (isFreeShipping ? 0.0 : _deliveryPrice);
+                                    qty * (_supplyPrice ?? 0.0) +
+                                    (isFreeShipping ? 0.0 : (_deliveryPrice ?? 0.0));
 
                                 _pricePoints[index]['price'] = calculatedPrice;
 
@@ -1460,9 +1469,7 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
                                           TableCellVerticalAlignment.middle,
                                       child: TextFormField(
                                         initialValue: pt['quantity'].toString(),
-                                        key: ValueKey(
-                                          'qty_${pt['isMax']}_$qty',
-                                        ),
+                                        key: ObjectKey(pt),
                                         textAlign: TextAlign.center,
                                         readOnly: isMaxRow,
                                         keyboardType: TextInputType.number,
@@ -1635,56 +1642,21 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
                         decoration: BoxDecoration(
                           border: Border.all(color: Colors.black, width: 1),
                         ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
                         child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text(
-                              tr('pe_enter_number_hint'),
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            SizedBox(
-                              width: 50,
-                              child: TextFormField(
-                                initialValue: _deliveryMinDays.toString(),
-                                textAlign: TextAlign.center,
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.digitsOnly,
-                                ],
-                                decoration: const InputDecoration(
-                                  isDense: true,
-                                  border: InputBorder.none,
-                                ),
-                                onSaved:
-                                    (val) =>
-                                        _deliveryMinDays =
-                                            int.tryParse(val ?? '') ?? 1,
-                              ),
-                            ),
                             const Text(
-                              ' ~ ',
+                              '[',
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            Text(
-                              tr('pe_enter_number_hint'),
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
                             SizedBox(
-                              width: 50,
+                              width: 30,
                               child: TextFormField(
-                                initialValue: _deliveryMaxDays.toString(),
+                                initialValue: _deliveryMinDays?.toString() ?? '',
                                 textAlign: TextAlign.center,
                                 keyboardType: TextInputType.number,
                                 inputFormatters: [
@@ -1693,15 +1665,54 @@ class _ProductProposalFormState extends State<ProductProposalForm> {
                                 decoration: const InputDecoration(
                                   isDense: true,
                                   border: InputBorder.none,
+                                  contentPadding: EdgeInsets.zero,
                                 ),
-                                onSaved:
-                                    (val) =>
-                                        _deliveryMaxDays =
-                                            int.tryParse(val ?? '') ?? 3,
+                                onSaved: (val) => _deliveryMinDays = int.tryParse(val ?? ''),
                               ),
                             ),
                             Text(
-                              tr('pe_days'),
+                              ']${tr('pe_days')}',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 8.0),
+                              child: Text(
+                                '~',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            const Text(
+                              '[',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            SizedBox(
+                              width: 30,
+                              child: TextFormField(
+                                initialValue: _deliveryMaxDays?.toString() ?? '',
+                                textAlign: TextAlign.center,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
+                                decoration: const InputDecoration(
+                                  isDense: true,
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                                onSaved: (val) => _deliveryMaxDays = int.tryParse(val ?? ''),
+                              ),
+                            ),
+                            Text(
+                              ']${tr('pe_days')}',
                               style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,

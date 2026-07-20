@@ -1372,7 +1372,7 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
                                     TableCellVerticalAlignment.middle,
                                 child: TextFormField(
                                   initialValue: pt['quantity'].toString(),
-                                  key: ValueKey('qty_${pt['isMax']}_$qty'),
+                                  key: ObjectKey(pt),
                                   textAlign: TextAlign.center,
                                   readOnly: isMaxRow,
                                   keyboardType: TextInputType.number,
@@ -1532,21 +1532,19 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.black, width: 1),
                   ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        tr('pe_enter_number_hint'),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
+                      const Text(
+                        '[',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                       SizedBox(
-                        width: 50,
+                        width: 30,
                         child: TextFormField(
                           initialValue: _deliveryMinDays.toString(),
                           textAlign: TextAlign.center,
@@ -1557,6 +1555,7 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
                           decoration: const InputDecoration(
                             isDense: true,
                             border: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
                           ),
                           onSaved:
                               (val) =>
@@ -1564,22 +1563,32 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
                                       int.tryParse(val ?? '') ?? 1,
                         ),
                       ),
+                      Text(
+                        ']${tr('pe_days')}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8.0),
+                        child: Text(
+                          '~',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
                       const Text(
-                        ' ~ ',
+                        '[',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      Text(
-                        tr('pe_enter_number_hint'),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
-                      ),
                       SizedBox(
-                        width: 50,
+                        width: 30,
                         child: TextFormField(
                           initialValue: _deliveryMaxDays.toString(),
                           textAlign: TextAlign.center,
@@ -1590,6 +1599,7 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
                           decoration: const InputDecoration(
                             isDense: true,
                             border: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
                           ),
                           onSaved:
                               (val) =>
@@ -1598,7 +1608,7 @@ class _ProductEditFormWidgetState extends State<ProductEditFormWidget> {
                         ),
                       ),
                       Text(
-                        tr('pe_days'),
+                        ']${tr('pe_days')}',
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,

@@ -393,7 +393,7 @@ const Map<String, Map<String, String>> localizedTexts = {
     'ko': '수량 가격 옵션 추가',
     'en': 'Add quantity price option',
   },
-  'pe_delivery_days': {'ko': '배송일', 'en': 'Delivery Date'},
+  'pe_delivery_days': {'ko': '배송일 소요일', 'en': 'Delivery Days Required'},
   'pe_enter_number_hint': {'ko': '[ 숫자입력 ] ', 'en': '[Enter number] '},
   'pe_days': {'ko': '일', 'en': 'days'},
   'pe_storage_info': {'ko': '보관법 및 소비기한', 'en': 'Storage method & Expiry date'},

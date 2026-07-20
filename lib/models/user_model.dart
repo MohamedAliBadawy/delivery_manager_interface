@@ -126,7 +126,7 @@ class MyUser {
     return MyUser(
       userId: (doc['userId'] ?? doc['uid'] ?? '') as String,
       email: (doc['email'] ?? '') as String,
-      name: (doc['name'] ?? '삭제된 사용자') as String,
+      name: (doc['brandName'] ?? doc['name'] ?? '삭제된 사용자') as String,
       url: (doc['url'] ?? 'https://i.ibb.co/mrVrHy7z/avatar.png') as String,
       blocked:
           (doc['blocked'] as List<dynamic>?)
